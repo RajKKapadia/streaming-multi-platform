@@ -1,0 +1,10 @@
+node_modules/
+.turbo/
+**/dist/
+.env
+.env.*
+!.env.example
+media/**/*
+!media/**/
+!media/**/.gitkeep
+test-results/

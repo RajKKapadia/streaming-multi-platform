@@ -1,0 +1,16 @@
+{
+  "name": "@studio/contracts",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "check-types": "tsc --noEmit",
+    "lint": "biome lint src",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "zod": "latest"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,141 @@
+import {
+  AccessToken,
+  RoomServiceClient,
+  EgressClient,
+  StartEgressRequest,
+  TemplateSource,
+  Output,
+  StreamOutput,
+  StreamProtocol,
+  EncodingOptions,
+  AudioCodec,
+  VideoCodec,
+  TrackSource,
+  EgressStatus,
+  type EgressInfo,
+} from "livekit-server-sdk";
+import type { Encoding, ParticipantInfo, Role, StudioState } from "@studio/contracts";
+import type { Config } from "./config";
+export interface Gateway {
+  ensureRoom(name: string, state: StudioState): Promise<StudioState>;
+  readState(name: string): Promise<StudioState | null>;
+  publishState(name: string, state: StudioState): Promise<void>;
+  participants(name: string): Promise<ParticipantInfo[]>;
+  token(name: string, identity: string, displayName: string, role: Role): Promise<string>;
+  start(name: string, renderUrl: string, urls: string[], encoding: Encoding): Promise<EgressInfo>;
+  list(name: string): Promise<EgressInfo[]>;
+  stop(id: string): Promise<void>;
+}
+export class LiveKitGateway implements Gateway {
+  private rooms: RoomServiceClient;
+  private egress: EgressClient;
+  constructor(private config: Config) {
+    const url = config.livekitUrl.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
+    this.rooms = new RoomServiceClient(url, config.apiKey, config.apiSecret);
+    this.egress = new EgressClient(url, config.apiKey, config.apiSecret);
+  }
+  async readState(name: string) {
+    const room = (await this.rooms.listRooms([name]))[0];
+    if (!room?.metadata) return null;
+    try {
+      return JSON.parse(room.metadata) as StudioState;
+    } catch {
+      return null;
+    }
+  }
+  async ensureRoom(name: string, state: StudioState) {
+    const existing = await this.readState(name);
+    if (existing) return existing;
+    await this.rooms.createRoom({
+      name,
+      emptyTimeout: 3600,
+      departureTimeout: 60,
+      metadata: JSON.stringify(state),
+    });
+    return state;
+  }
+  async publishState(name: string, state: StudioState) {
+    await this.rooms.updateRoomMetadata(name, JSON.stringify(state));
+  }
+  async participants(name: string): Promise<ParticipantInfo[]> {
+    return (await this.rooms.listParticipants(name))
+      .filter((p) => p.identity === "host" || p.identity.startsWith("guest-"))
+      .map((p) => ({
+        identity: p.identity,
+        name: p.name || p.identity,
+        role: p.identity === "host" ? "host" : "guest",
+        camera: p.tracks.some((t) => t.source === TrackSource.CAMERA && !t.muted),
+        microphone: p.tracks.some((t) => t.source === TrackSource.MICROPHONE && !t.muted),
+        screenSid:
+          p.tracks.find((t) => t.source === TrackSource.SCREEN_SHARE && !t.muted)?.sid ?? null,
+      }));
+  }
+  async token(name: string, identity: string, displayName: string, role: Role) {
+    const at = new AccessToken(this.config.apiKey, this.config.apiSecret, {
+      identity,
+      name: displayName,
+      ttl: role === "guest" ? 60 : 3600,
+      metadata: JSON.stringify({ role }),
+    });
+    at.addGrant({
+      roomJoin: true,
+      room: name,
+      canPublish: role !== "renderer",
+      canSubscribe: true,
+      canPublishData: false,
+      canUpdateOwnMetadata: false,
+    });
+    return at.toJwt();
+  }
+  async start(name: string, renderUrl: string, urls: string[], e: Encoding) {
+    const encodingOptions = createEncodingOptions(e);
+    if (typeof this.egress.startEgress === "function")
+      return this.egress.startEgress(
+        new StartEgressRequest({
+          roomName: name,
+          source: { case: "template", value: new TemplateSource({ customBaseUrl: renderUrl }) },
+          encoding: { case: "advanced", value: encodingOptions },
+          outputs: [
+            new Output({
+              config: {
+                case: "stream",
+                value: new StreamOutput({ protocol: StreamProtocol.RTMP, urls }),
+              },
+            }),
+          ],
+        }),
+      );
+    return this.egress.startRoomCompositeEgress(
+      name,
+      new StreamOutput({ protocol: StreamProtocol.RTMP, urls }),
+      { customBaseUrl: renderUrl, encodingOptions },
+    );
+  }
+  async list(name: string) {
+    return this.egress.listEgress({ roomName: name });
+  }
+  async stop(id: string) {
+    await this.egress.stopEgress(id);
+  }
+}
+export function activeEgress(e: EgressInfo) {
+  return [
+    EgressStatus.EGRESS_STARTING,
+    EgressStatus.EGRESS_ACTIVE,
+    EgressStatus.EGRESS_ENDING,
+  ].includes(e.status);
+}
+
+export function createEncodingOptions(e: Encoding) {
+  return new EncodingOptions({
+    width: e.width,
+    height: e.height,
+    framerate: e.fps,
+    videoCodec: VideoCodec.H264_MAIN,
+    videoBitrate: e.bitrate,
+    audioCodec: AudioCodec.AAC,
+    audioBitrate: 128,
+    audioFrequency: 48000,
+    keyFrameInterval: 2,
+  });
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@studio/ui",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.tsx",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "check-types": "tsc --noEmit",
+    "lint": "biome lint src"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "latest",
+    "@radix-ui/react-switch": "latest",
+    "@radix-ui/react-slider": "latest",
+    "@radix-ui/react-tabs": "latest",
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "tailwind-merge": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}

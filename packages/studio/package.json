@@ -1,0 +1,22 @@
+{
+  "name": "@studio/rendering",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.tsx",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "check-types": "tsc --noEmit",
+    "lint": "biome lint src",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@studio/contracts": "workspace:*",
+    "livekit-client": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}

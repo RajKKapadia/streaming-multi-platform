@@ -1,0 +1,24 @@
+{
+  "name": "streaming-multi-platform",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "check-types": "turbo run check-types",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "start": "bun apps/api/src/index.ts"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.7",
+    "typescript": "latest",
+    "@types/bun": "latest",
+    "@biomejs/biome": "latest"
+  }
+}

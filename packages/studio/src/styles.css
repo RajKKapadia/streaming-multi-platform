@@ -1,0 +1,79 @@
+.program-camera {
+  overflow: hidden;
+  background: #161c2a;
+  border-radius: 12px;
+  color: white;
+}
+.program-screen {
+  overflow: hidden;
+  background: #080b12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c8d0e0;
+}
+.program-avatar {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #283c68, #14203a);
+}
+.program-avatar span {
+  display: grid;
+  place-items: center;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: #5279c8;
+  color: white;
+  font: 600 100px system-ui;
+}
+.program-name {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  border-radius: 8px;
+  padding: 12px 24px;
+  background: #114be8;
+  color: white;
+  font: 500 32px system-ui;
+}
+.program-logo {
+  position: absolute;
+  top: 60px;
+  width: 200px;
+  height: 130px;
+  object-fit: contain;
+  z-index: 4;
+}
+.program-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.program-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.program-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffffa8;
+  font: 400 42px system-ui;
+}
+.program-empty span {
+  font-size: 110px;
+}
+.program-missing {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: white;
+  font: 40px system-ui;
+}

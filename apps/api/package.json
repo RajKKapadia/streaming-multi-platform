@@ -1,0 +1,23 @@
+{
+  "name": "@studio/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "tsc --noEmit",
+    "check-types": "tsc --noEmit",
+    "lint": "biome lint src",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@studio/contracts": "workspace:*",
+    "express": "latest",
+    "cookie-parser": "latest",
+    "livekit-server-sdk": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/express": "latest",
+    "@types/cookie-parser": "latest"
+  }
+}
