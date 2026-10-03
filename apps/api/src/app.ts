@@ -27,8 +27,8 @@ export function createApp(config: Config, gateway?: Gateway) {
       const origin = req.headers.origin;
       const allowed = new Set([
         new URL(config.publicUrl).origin,
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
+        "http://localhost:3003",
+        "http://127.0.0.1:3003",
       ]);
       if (!allowed.has(origin))
         return res.status(403).json({ error: "This request origin is not allowed." });

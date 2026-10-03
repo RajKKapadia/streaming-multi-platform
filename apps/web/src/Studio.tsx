@@ -610,23 +610,6 @@ export function Studio({
                             <Star size={13} fill={selected ? "currentColor" : "none"} />
                           </button>
                         )}
-                        {source.screenSid && (
-                          <button
-                            title="Stage screen share"
-                            aria-label={`Stage ${source.name}'s screen`}
-                            onClick={() =>
-                              void command({
-                                type: "screen",
-                                screen: {
-                                  identity: source.identity,
-                                  sid: source.screenSid!,
-                                },
-                              })
-                            }
-                          >
-                            <ScreenShare size={14} />
-                          </button>
-                        )}
                       </div>
                     )}
                   </div>

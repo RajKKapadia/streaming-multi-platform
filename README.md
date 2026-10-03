@@ -23,7 +23,7 @@ LIVEKIT_API_SECRET=your-api-secret
 PUBLIC_APP_URL=http://localhost:3001
 ```
 
-Generate the signing secret with `openssl rand -hex 32`. Keep `.env` private. Both development and production load this root file; restart the API after editing it. The API runs on port 3001. Enter your display name and host passcode on prejoin. Enabling devices is optional; entering does not go live. M toggles microphone, C toggles camera.
+Generate the signing secret with `openssl rand -hex 32`. Keep `.env` private. Both development and production load this root file; restart the API after editing it. The API defaults to port 3001; set `PORT` in the root `.env` to change it. The development frontend proxies to that configured port. Enter your display name and host passcode on prejoin. Click **Start mic check** to test the microphone independently, or enable both devices in the camera preview. Enabling devices is optional; entering does not go live. M toggles microphone, C toggles camera.
 
 ## Public application and broadcasting
 
@@ -64,6 +64,8 @@ Place your own licensed files in these root folders and click Refresh in Media. 
 Use browser-compatible codecs (for example, H.264/AAC in MP4, or VP8/VP9/Opus in WebM). Playback is enabled only after browser probing succeeds; files are not transcoded. Unsupported or damaged files display an error. Images retain transparency. No upload or asset registration workflow is needed. The media endpoint supports byte ranges and rejects escaping symlinks.
 
 Clips hide live branding and exclude live microphones from the **program** without muting participants in the room. Music pauses at its current position and resumes when the clip ends or is stopped; sound effects stop. Outgoing voices remain controlled by stage membership even when their cameras are invisible in the selected layout. Removing someone from stage leaves them in the room. Guests return backstage after disconnecting.
+
+Screen shares appear as separate preview cards below People. The host's share goes straight to a screen layout. A guest's share stays backstage until the host clicks **Stage screen** on its card. Staging a screen switches a camera layout to **Screen + presenter**; an existing screen layout is preserved. **Remove from stage** keeps capture running, while **Stop sharing** ends your capture. When the selected share ends, the stage returns to the camera grid.
 
 The host and guests hear each other's room voices. Effects audio reaches viewers; guests do not hear it. The host headphone monitor defaults off and plays effects only. Wear headphones when enabling it. Preview videos stay muted and the host's microphone is never played locally. Camera blur and virtual backgrounds are applied in Settings; add background images and Refresh before selecting a virtual background.
 

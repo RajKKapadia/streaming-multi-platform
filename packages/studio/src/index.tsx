@@ -244,7 +244,11 @@ export function ProgramCanvas({
       .filter((p): p is Source => !!p);
   const featured = staged.find((p) => p.identity === state.featured) ?? staged[0],
     others = staged.filter((p) => p !== featured),
-    screen = sources.find((p) => p.identity === state.screen?.identity);
+    screen = sources.find(
+      (p) =>
+        p.identity === state.screen?.identity &&
+        (p.screenSid ?? p.screen?.sid) === state.screen?.sid,
+    );
   const tiles: { source?: Source; style: CSSProperties }[] = [],
     screens: CSSProperties[] = [];
   const rect = (left: number, top: number, width: number, height: number): CSSProperties => ({
@@ -259,19 +263,17 @@ export function ProgramCanvas({
       if (featured) tiles.push({ source: featured, style: rect(0, 0, 1920, 1080) });
       break;
     case "split":
-      staged
-        .slice(0, 2)
-        .forEach((s, i) =>
-          tiles.push({
-            source: s,
-            style: rect(
-              i * (1920 / Math.min(2, staged.length)),
-              0,
-              1920 / Math.min(2, staged.length),
-              1080,
-            ),
-          }),
-        );
+      staged.slice(0, 2).forEach((s, i) =>
+        tiles.push({
+          source: s,
+          style: rect(
+            i * (1920 / Math.min(2, staged.length)),
+            0,
+            1920 / Math.min(2, staged.length),
+            1080,
+          ),
+        }),
+      );
       break;
     case "grid":
       staged.forEach((s, i) => {

@@ -14,6 +14,7 @@ import {
 import { Button, Input } from "@studio/ui";
 import { VideoTrack } from "@studio/rendering";
 import type { JoinResponse } from "@studio/contracts";
+import { TrackEvent } from "livekit-client";
 import { api, studioPath } from "./api";
 import { usePreferences } from "./store";
 import { useMicrophoneLevel, type Capture } from "./devices";
@@ -48,8 +49,22 @@ export function Prejoin({
     void api<{ studio: string; role: string } | null>("/session").then(setSession);
   }, []);
   useEffect(() => {
-    setCamMuted(!!capture.camera?.isMuted);
-    setMicMuted(!!capture.microphone?.isMuted);
+    const sync = () => {
+      setCamMuted(!!capture.camera?.isMuted);
+      setMicMuted(!!capture.microphone?.isMuted);
+    };
+    sync();
+    const tracks = [capture.camera, capture.microphone];
+    for (const track of tracks) {
+      track?.on(TrackEvent.Muted, sync);
+      track?.on(TrackEvent.Unmuted, sync);
+    }
+    return () => {
+      for (const track of tracks) {
+        track?.off(TrackEvent.Muted, sync);
+        track?.off(TrackEvent.Unmuted, sync);
+      }
+    };
   }, [capture.camera, capture.microphone]);
   const join = async () => {
     setBusy(true);
@@ -134,7 +149,14 @@ export function Prejoin({
                 <Button
                   size="icon"
                   variant="ghost"
-                  aria-label={micMuted ? "Unmute microphone" : "Mute microphone"}
+                  disabled={capture.busy}
+                  aria-label={
+                    !capture.microphone
+                      ? "Enable microphone"
+                      : micMuted
+                        ? "Unmute microphone"
+                        : "Mute microphone"
+                  }
                   onClick={() => void toggle("microphone")}
                 >
                   {micMuted ? <MicOff size={19} /> : <Mic size={19} />}
@@ -142,7 +164,14 @@ export function Prejoin({
                 <Button
                   size="icon"
                   variant="ghost"
-                  aria-label={camMuted ? "Turn camera on" : "Turn camera off"}
+                  disabled={capture.busy}
+                  aria-label={
+                    !capture.camera
+                      ? "Enable camera"
+                      : camMuted
+                        ? "Turn camera on"
+                        : "Turn camera off"
+                  }
                   onClick={() => void toggle("camera")}
                 >
                   {camMuted ? <CameraOff size={19} /> : <Camera size={19} />}
