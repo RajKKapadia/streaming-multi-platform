@@ -12,6 +12,7 @@ type Preferences = {
   fps: 30 | 60;
   effect: "none" | "blur" | "image";
   backgroundId: string;
+  localBackground: { url: string; name: string } | null;
   set: (value: Partial<Omit<Preferences, "set">>) => void;
 };
 export const usePreferences = create<Preferences>()(
@@ -32,8 +33,15 @@ export const usePreferences = create<Preferences>()(
       fps: 60,
       effect: "none",
       backgroundId: "",
+      localBackground: null,
       set: (value) => set(value),
     }),
-    { name: "studio-preferences-v1" },
+    {
+      name: "studio-preferences-v1",
+      partialize: ({ localBackground, ...preferences }) => ({
+        ...preferences,
+        effect: localBackground && preferences.effect === "image" ? "none" : preferences.effect,
+      }),
+    },
   ),
 );

@@ -4,6 +4,9 @@
   border-radius: 12px;
   color: white;
 }
+.program-container:is([data-layout="solo"], [data-layout="split"]) .program-camera {
+  border-radius: 0;
+}
 .program-screen {
   overflow: hidden;
   background: #080b12;

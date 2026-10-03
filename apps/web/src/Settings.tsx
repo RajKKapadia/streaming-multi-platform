@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Camera, Mic, Sparkles, Settings as SettingsIcon, Headphones } from "lucide-react";
-import { Dialog, Button, Select, Switch } from "@studio/ui";
+import { Dialog, Button, Input, Select, Switch } from "@studio/ui";
 import { VideoTrack } from "@studio/rendering";
 import { usePreferences } from "./store";
 import { applyDevices, type Capture } from "./devices";
@@ -10,22 +10,57 @@ export function Settings({
   onClose,
   capture,
   assets,
+  autoEnableCamera = false,
 }: {
   open: boolean;
   onClose: () => void;
   capture: Capture;
   assets: Asset[];
+  autoEnableCamera?: boolean;
 }) {
   const p = usePreferences(),
     [tab, setTab] = useState("camera"),
     [error, setError] = useState(""),
+    [loadingImage, setLoadingImage] = useState(false),
     [saving, setSaving] = useState(false);
   const settings = capture.camera?.mediaStreamTrack.getSettings();
+  const backgrounds = assets.filter((a) => a.category === "backgrounds");
+  const chooseImage = async (file?: File) => {
+    if (!file) return;
+    setLoadingImage(true);
+    setError("");
+    let url: string | undefined;
+    try {
+      if (!["image/png", "image/jpeg", "image/webp"].includes(file.type))
+        throw new Error("Choose a PNG, JPEG, or WebP image.");
+      url = URL.createObjectURL(file);
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+      p.set({ backgroundId: "", localBackground: { url, name: file.name } });
+    } catch (e) {
+      if (url) URL.revokeObjectURL(url);
+      setError(e instanceof Error ? e.message : "The background image could not be opened.");
+    } finally {
+      setLoadingImage(false);
+    }
+  };
   const save = async () => {
     setSaving(true);
     setError("");
     try {
-      await applyDevices(capture.camera, capture.microphone, assets);
+      if (
+        p.effect === "image" &&
+        !p.localBackground &&
+        !backgrounds.some((a) => a.id === p.backgroundId)
+      )
+        throw new Error("Choose a background image from your computer or the media library.");
+      const camera =
+        capture.camera ??
+        (autoEnableCamera && p.effect !== "none" ? await capture.enable("camera") : undefined);
+      if (p.effect !== "none" && !camera)
+        throw new Error("Enable your camera to apply a camera effect. Check camera permissions.");
+      await applyDevices(camera, capture.microphone, assets);
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -164,26 +199,54 @@ export function Settings({
                 </Select>
               </label>
               {p.effect === "image" && (
-                <label>
-                  Background image
-                  <Select
-                    value={p.backgroundId}
-                    onChange={(e) => p.set({ backgroundId: e.target.value })}
-                  >
-                    <option value="">Choose an image</option>
-                    {assets
-                      .filter((a) => a.category === "backgrounds")
-                      .map((a) => (
+                <>
+                  <label>
+                    Background image
+                    <Select
+                      value={p.localBackground ? "local" : p.backgroundId}
+                      disabled={
+                        loadingImage || saving || (!p.localBackground && !backgrounds.length)
+                      }
+                      onChange={(e) => {
+                        if (e.target.value !== "local")
+                          p.set({ backgroundId: e.target.value, localBackground: null });
+                      }}
+                    >
+                      <option value="">
+                        {backgrounds.length ? "Choose an image" : "No library images available"}
+                      </option>
+                      {p.localBackground && <option value="local">{p.localBackground.name}</option>}
+                      {backgrounds.map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.name}
                         </option>
                       ))}
-                  </Select>
-                </label>
+                    </Select>
+                  </label>
+                  <label>
+                    Choose image from computer
+                    <Input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      disabled={loadingImage || saving}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        void chooseImage(file);
+                      }}
+                    />
+                  </label>
+                  <p className="hint">
+                    {loadingImage
+                      ? "Opening image…"
+                      : "PNG, JPEG, or WebP. Local images stay selected until you reload the page."}
+                  </p>
+                </>
               )}
               <p className="hint">
-                Camera effects are included in your published video. Add images to media/backgrounds
-                and Refresh in the studio.
+                Camera effects are included in your published video. Choose an image, then apply
+                settings. Shared library images are loaded when you open setup settings while signed
+                in or using a guest invitation.
               </p>
             </>
           )}
@@ -202,7 +265,7 @@ export function Settings({
             <Button variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={saving}>
+            <Button onClick={save} disabled={saving || loadingImage}>
               {saving ? "Applying…" : "Apply settings"}
             </Button>
           </div>

@@ -61,6 +61,7 @@ export function useCapture() {
       tracks.filter((t) => !retained.includes(t)).forEach((t) => t.stop());
       setTracks([...retained, ...ts]);
       await refresh();
+      return [...retained, ...ts].find((t): t is LocalVideoTrack => t instanceof LocalVideoTrack);
     } catch (e) {
       setError(
         e instanceof Error
@@ -132,6 +133,11 @@ export async function applyDevices(
   assets: Asset[],
 ) {
   const p = usePreferences.getState();
+  const background =
+    p.localBackground?.url ??
+    assets.find((a) => a.id === p.backgroundId && a.category === "backgrounds")?.url;
+  if (p.effect === "image" && !background)
+    throw new Error("Choose a background image from your computer or the media library.");
   if (camera) {
     await camera.restartTrack({
       deviceId: p.cameraId || undefined,
@@ -148,14 +154,11 @@ export async function applyDevices(
       );
       if (!supportsBackgroundProcessors())
         throw new Error("Camera effects are unavailable in this browser.");
-      const asset = assets.find((a) => a.id === p.backgroundId);
-      if (p.effect === "image" && !asset)
-        throw new Error("Choose a background image from the media library.");
       await camera.setProcessor(
         BackgroundProcessor(
           p.effect === "blur"
             ? { mode: "background-blur", blurRadius: 12 }
-            : { mode: "virtual-background", imagePath: asset!.url },
+            : { mode: "virtual-background", imagePath: background! },
         ),
       );
     }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Room, Track, LocalVideoTrack, LocalAudioTrack } from "livekit-client";
 import {
@@ -551,69 +551,123 @@ export function Studio({
               {host ? "Choose who appears on stage." : "The host controls who appears on stage."}
             </p>
           </div>
-          <div className="backstage-cards">
+          <div
+            className="backstage-cards"
+            role="region"
+            aria-label="People and screen shares"
+            tabIndex={0}
+          >
             {sources.map((source) => {
               const staged = state.participants.includes(source.identity),
-                selected = state.featured === source.identity;
+                selected = state.featured === source.identity,
+                screenSelected = state.screen?.sid === source.screenSid,
+                local = source.identity === room?.localParticipant.identity;
               return (
-                <article
-                  className={`person-card ${staged ? "on-stage" : ""}`}
-                  key={source.identity}
-                >
-                  <div className="person-preview">
-                    {source.camera && !source.cameraMuted ? (
-                      <VideoTrack
-                        track={source.camera}
-                        mirror={
-                          preferences.mirror && source.identity === (joinData?.identity ?? "host")
-                        }
-                      />
-                    ) : (
-                      <span className="person-avatar">{source.name.charAt(0)}</span>
-                    )}
-                    <span className="person-status">{staged ? "ON STAGE" : "BACKSTAGE"}</span>
-                    {selected && (
-                      <span className="person-featured">
-                        <Star size={11} fill="currentColor" />
-                      </span>
-                    )}
-                    {host && (
-                      <button
-                        className="person-stage-button"
-                        aria-label={`${staged ? "Remove" : "Add"} ${source.name} ${staged ? "from" : "to"} stage`}
-                        onClick={() =>
-                          void command({
-                            type: staged ? "stage.remove" : "stage.add",
-                            identity: source.identity,
-                          })
-                        }
-                      >
-                        {staged ? "Remove" : "Add to stage"}
-                      </button>
-                    )}
-                  </div>
-                  <div className="person-details">
-                    <span>
-                      {source.name}
-                      {source.identity === "host" && <small>Host</small>}
-                    </span>
-                    {host && (
-                      <div>
-                        {staged && (
+                <Fragment key={source.identity}>
+                  <article className={`person-card ${staged ? "on-stage" : ""}`}>
+                    <div className="person-preview">
+                      {source.camera && !source.cameraMuted ? (
+                        <VideoTrack
+                          track={source.camera}
+                          mirror={
+                            preferences.mirror && source.identity === (joinData?.identity ?? "host")
+                          }
+                        />
+                      ) : (
+                        <span className="person-avatar">{source.name.charAt(0)}</span>
+                      )}
+                      <span className="person-status">{staged ? "ON STAGE" : "BACKSTAGE"}</span>
+                      {selected && (
+                        <span className="person-featured">
+                          <Star size={11} fill="currentColor" />
+                        </span>
+                      )}
+                      {host && (
+                        <div className="source-actions">
                           <button
-                            title="Feature camera"
-                            aria-label={`Feature ${source.name}`}
+                            className="person-stage-button"
+                            aria-label={`${staged ? "Remove" : "Add"} ${source.name} ${staged ? "from" : "to"} stage`}
                             onClick={() =>
-                              void command({ type: "feature", identity: source.identity })
+                              void command({
+                                type: staged ? "stage.remove" : "stage.add",
+                                identity: source.identity,
+                              })
                             }
                           >
-                            <Star size={13} fill={selected ? "currentColor" : "none"} />
+                            {staged ? "Remove" : "Add to stage"}
                           </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="person-details">
+                      <span>
+                        {source.name}
+                        {source.identity === "host" && <small>Host</small>}
+                      </span>
+                      {host && (
+                        <div>
+                          {staged && (
+                            <button
+                              title="Feature camera"
+                              aria-label={`Feature ${source.name}`}
+                              onClick={() =>
+                                void command({ type: "feature", identity: source.identity })
+                              }
+                            >
+                              <Star size={13} fill={selected ? "currentColor" : "none"} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                  {source.screenSid && (
+                    <article className={`screen-share-card ${screenSelected ? "on-stage" : ""}`}>
+                      <div className="screen-share-preview">
+                        {source.screen ? (
+                          <VideoTrack track={source.screen} fit="contain" />
+                        ) : (
+                          <span>Connecting screen…</span>
                         )}
+                        <span className="person-status">
+                          {screenSelected ? "ON STAGE" : "BACKSTAGE"}
+                        </span>
+                        <div className="source-actions">
+                          {host && (
+                            <button
+                              className="person-stage-button"
+                              aria-label={`${screenSelected ? "Remove" : "Stage"} ${source.name}'s screen`}
+                              title={screenSelected ? "Remove from stage" : "Stage screen"}
+                              onClick={() =>
+                                void command({
+                                  type: "screen",
+                                  screen: screenSelected
+                                    ? null
+                                    : { identity: source.identity, sid: source.screenSid! },
+                                })
+                              }
+                            >
+                              {screenSelected ? "Remove" : "Stage screen"}
+                            </button>
+                          )}
+                          {local && (
+                            <button
+                              className="person-stage-button"
+                              disabled={deviceBusy}
+                              onClick={() => void toggle("screen")}
+                            >
+                              Stop sharing
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </article>
+                      <div className="screen-share-details" title={`${source.name}’s screen`}>
+                        <ScreenShare size={13} />
+                        <span>{source.name}’s screen</span>
+                      </div>
+                    </article>
+                  )}
+                </Fragment>
               );
             })}
             {host && sources.length < 4 && (
@@ -624,66 +678,6 @@ export function Studio({
               </button>
             )}
           </div>
-          {sources.some((source) => source.screenSid) && (
-            <div className="screen-share-cards" aria-label="Available screen shares">
-              {sources
-                .filter((source) => source.screenSid)
-                .map((source) => {
-                  const selected = state.screen?.sid === source.screenSid;
-                  const local = source.identity === room?.localParticipant.identity;
-                  return (
-                    <article
-                      className={`screen-share-card ${selected ? "on-stage" : ""}`}
-                      key={source.screenSid}
-                    >
-                      <div className="screen-share-preview">
-                        {source.screen ? (
-                          <VideoTrack track={source.screen} fit="contain" />
-                        ) : (
-                          <span>Connecting screen…</span>
-                        )}
-                        <span className="person-status">{selected ? "ON STAGE" : "BACKSTAGE"}</span>
-                      </div>
-                      <div className="screen-share-details">
-                        <span>
-                          <ScreenShare size={14} />
-                          {source.name}’s screen
-                        </span>
-                        <div>
-                          {host && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              aria-label={`${selected ? "Remove" : "Stage"} ${source.name}'s screen`}
-                              onClick={() =>
-                                void command({
-                                  type: "screen",
-                                  screen: selected
-                                    ? null
-                                    : { identity: source.identity, sid: source.screenSid! },
-                                })
-                              }
-                            >
-                              {selected ? "Remove from stage" : "Stage screen"}
-                            </Button>
-                          )}
-                          {local && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={deviceBusy}
-                              onClick={() => void toggle("screen")}
-                            >
-                              Stop sharing
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-            </div>
-          )}
           {failed && (
             <button className="failed-output" onClick={() => setDestinations(true)}>
               An output needs attention. Open destinations to inspect its status.

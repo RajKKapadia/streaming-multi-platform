@@ -342,6 +342,39 @@ test("HTTP routes enforce host authorization and scoped media access", async () 
     expect(
       (await request(`/api/studios/personal/state?access=${encodeURIComponent(invite)}`)).status,
     ).toBe(401);
+    await mkdir(join(root, "backgrounds"));
+    await writeFile(join(root, "backgrounds", "room.png"), "background-image");
+    expect((await request("/api/studios/personal/backgrounds")).status).toBe(401);
+    const backgrounds = await request(
+      `/api/studios/personal/backgrounds?access=${encodeURIComponent(invite)}`,
+    );
+    expect(backgrounds.status).toBe(200);
+    const manifest = await backgrounds.json();
+    expect(manifest.assets).toHaveLength(1);
+    expect(manifest.assets[0].category).toBe("backgrounds");
+    expect(await (await fetch(`${base}${manifest.assets[0].url}`)).text()).toBe("background-image");
+    expect(
+      (await request("/api/studios/personal/backgrounds", "GET", undefined, hostCookie)).status,
+    ).toBe(200);
+    expect(
+      (await request(`/api/studios/other/backgrounds?access=${encodeURIComponent(invite)}`)).status,
+    ).toBe(401);
+    expect((await request("/api/studios/personal/backgrounds?access=invalid")).status).toBe(401);
+    const expiredInvite = auth.sign({
+      role: "guest",
+      studio: "personal",
+      identity: "invite",
+      name: "Guest",
+      expires: Date.now() - 1000,
+      purpose: "invite",
+    });
+    expect(
+      (await request(`/api/studios/personal/backgrounds?access=${encodeURIComponent(expiredInvite)}`))
+        .status,
+    ).toBe(401);
+    expect(
+      (await request(`/api/studios/personal/assets?access=${encodeURIComponent(invite)}`)).status,
+    ).toBe(401);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await rm(root, { recursive: true });

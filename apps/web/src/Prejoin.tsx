@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button, Input } from "@studio/ui";
 import { VideoTrack } from "@studio/rendering";
-import type { JoinResponse } from "@studio/contracts";
+import type { Asset, JoinResponse } from "@studio/contracts";
 import { TrackEvent } from "livekit-client";
 import { api, studioPath } from "./api";
 import { usePreferences } from "./store";
@@ -36,6 +36,7 @@ export function Prejoin({
     [passcode, setPasscode] = useState(""),
     [busy, setBusy] = useState(false),
     [settings, setSettings] = useState(false),
+    [assets, setAssets] = useState<Asset[]>([]),
     [error, setError] = useState(""),
     [issues, setIssues] = useState<string[]>([]),
     [session, setSession] = useState<{ studio: string; role: string } | null>(null),
@@ -48,6 +49,21 @@ export function Prejoin({
       .catch((e) => setError(e.message));
     void api<{ studio: string; role: string } | null>("/session").then(setSession);
   }, []);
+  useEffect(() => {
+    setAssets([]);
+    if (!settings || (!invite && session?.studio !== studioId)) return;
+    let alive = true;
+    void api<{ assets: Asset[] }>(studioPath(studioId, "backgrounds", invite ?? undefined))
+      .then((data) => {
+        if (alive) setAssets(data.assets);
+      })
+      .catch((e) => {
+        if (alive) setError(e.message);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [settings, studioId, invite, session?.studio]);
   useEffect(() => {
     const sync = () => {
       setCamMuted(!!capture.camera?.isMuted);
@@ -275,7 +291,13 @@ export function Prejoin({
           Made for conversations worth sharing. <span>1080p · 60 fps program</span>
         </p>
       </main>
-      <Settings open={settings} onClose={() => setSettings(false)} capture={capture} assets={[]} />
+      <Settings
+        open={settings}
+        onClose={() => setSettings(false)}
+        capture={capture}
+        assets={assets}
+        autoEnableCamera
+      />
     </div>
   );
 }

@@ -816,39 +816,55 @@ svg {
   color: #919bad;
   min-width: 75px;
 }
-.screen-share-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-bottom: 18px;
+.person-card,
+.screen-share-card,
+.invite-card {
+  width: 180px;
+  height: 132px;
+  flex: 0 0 180px;
 }
+.person-card,
 .screen-share-card {
-  width: min(100%, 320px);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 30px;
   border: 1px solid #dee3ec;
   border-radius: 7px;
   background: white;
   overflow: hidden;
 }
+.person-card.on-stage,
 .screen-share-card.on-stage {
   border-color: #90b2ff;
+  box-shadow: 0 0 0 1px #d9e6ff;
 }
+.person-preview,
 .screen-share-preview {
   position: relative;
-  aspect-ratio: 16 / 9;
-  background: #161c2a;
-  color: white;
-}
-.screen-share-details {
-  padding: 10px;
-  display: grid;
-  gap: 8px;
-  font-size: 11px;
-}
-.screen-share-details > span,
-.screen-share-details > div {
+  min-height: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  overflow: hidden;
+}
+.screen-share-preview {
+  background: #161c2a;
+  color: white;
+  font-size: 10px;
+}
+.person-details,
+.screen-share-details {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px;
+  font-size: 9px;
+  min-width: 0;
+}
+.person-details > span,
+.screen-share-details > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .backstage-heading {
   display: flex;
@@ -872,30 +888,17 @@ svg {
 }
 .backstage-cards {
   display: flex;
-  gap: 10px;
-  min-height: 103px;
-  padding-bottom: 18px;
-}
-.person-card {
-  width: 148px;
   flex-shrink: 0;
-  background: white;
-  border: 1px solid #dee3ec;
-  border-radius: 7px;
-  overflow: hidden;
+  gap: 10px;
+  padding: 2px 2px 18px;
+  overflow-x: auto;
 }
-.person-card.on-stage {
-  border-color: #90b2ff;
-  box-shadow: 0 0 0 1px #d9e6ff;
+.backstage-cards:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 .person-preview {
-  height: 82px;
   background: linear-gradient(135deg, #e4eafb, #c6d6f3);
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
 }
 .person-avatar {
   display: grid;
@@ -928,35 +931,27 @@ svg {
   right: 6px;
   color: white;
 }
-.person-stage-button {
+.source-actions {
   position: absolute;
   bottom: 5px;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+}
+.person-stage-button {
   font-size: 9px;
   background: #fffffff0;
   border-radius: 4px;
   padding: 4px 9px;
   color: #3961a3;
   white-space: nowrap;
-  opacity: 0;
 }
-.person-card:hover .person-stage-button,
-.person-stage-button:focus-visible {
-  opacity: 1;
+.person-stage-button:hover {
+  background: white;
 }
 .person-details {
-  display: flex;
   justify-content: space-between;
-  gap: 4px;
-  align-items: center;
-  font-size: 9px;
-  padding: 7px;
-}
-.person-details > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .person-details small {
   color: #9da6b7;
@@ -974,8 +969,6 @@ svg {
   place-items: center;
 }
 .invite-card {
-  width: 148px;
-  height: 111px;
   border: 1px dashed #d9dfe9;
   border-radius: 7px;
   display: flex;
@@ -1549,16 +1542,6 @@ svg {
   .media-panel {
     width: 320px;
   }
-  .person-card,
-  .invite-card {
-    width: 174px;
-  }
-  .person-preview {
-    height: 98px;
-  }
-  .invite-card {
-    height: 127px;
-  }
   .media-section {
     padding: 22px 20px 0;
   }
@@ -1596,12 +1579,6 @@ svg {
   }
   .layout-label {
     display: none;
-  }
-  .person-card {
-    width: 125px;
-  }
-  .backstage-cards {
-    flex-wrap: wrap;
   }
   .backstage-heading p {
     display: none;
@@ -1751,16 +1728,6 @@ svg {
   }
   .backstage-cards {
     gap: 7px;
-    flex-wrap: wrap;
-  }
-  .person-card {
-    width: calc(50% - 4px);
-  }
-  .person-preview {
-    height: 85px;
-  }
-  .person-stage-button {
-    opacity: 1;
   }
   .studio-footer {
     margin: 0 -14px;

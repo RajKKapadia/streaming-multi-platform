@@ -16,6 +16,29 @@ export function createApp(config: Config, gateway?: Gateway) {
     media = new MediaLibrary(config.mediaRoot);
   const mediaAccess = new Map<string, { token: string; expires: number }>();
   const service = new StudioService(config, gateway ?? new LiveKitGateway(config), auth, media);
+  const mediaAssets = async (studio: string) => {
+    let entry = mediaAccess.get(studio);
+    if (!entry || entry.expires < Date.now() + 3600_000) {
+      const expires = Date.now() + 24 * 3600_000;
+      entry = {
+        token: auth.sign({
+          studio,
+          role: "renderer",
+          identity: "media",
+          name: "Media",
+          purpose: "media",
+          expires,
+        }),
+        expires,
+      };
+      mediaAccess.set(studio, entry);
+    }
+    const access = entry.token;
+    return (await media.scan()).map((a) => ({
+      ...a,
+      url: `${a.url}?access=${encodeURIComponent(access)}&v=${a.version}`,
+    }));
+  };
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "32kb" }), cookieParser());
@@ -114,6 +137,21 @@ export function createApp(config: Config, gateway?: Gateway) {
     const c = auth.verify(req.cookies["studio-session"], ["session"]);
     res.json(c?.purpose === "session" ? { role: c.role, studio: c.studio, name: c.name } : null);
   });
+  app.get("/api/studios/:studio/backgrounds", async (req, res) => {
+    const studio = studioSchema.safeParse(req.params.studio);
+    if (!studio.success) return res.status(400).json({ error: "Invalid studio identifier." });
+    const claims = [
+      auth.verify(req.cookies["studio-session"], ["session"]),
+      auth.verify(req.query.access, ["invite"]),
+    ].find((c) => c?.studio === studio.data);
+    if (!claims)
+      return res
+        .status(401)
+        .json({ error: "Sign in or use a valid guest invitation to load backgrounds." });
+    res.json({
+      assets: (await mediaAssets(studio.data)).filter((a) => a.category === "backgrounds"),
+    });
+  });
   app.use("/api/studios/:studio", (req, res, next) => {
     const studio = studioSchema.safeParse(req.params.studio);
     if (!studio.success) return res.status(400).json({ error: "Invalid studio identifier." });
@@ -177,30 +215,7 @@ export function createApp(config: Config, gateway?: Gateway) {
     res.json(await service.command(res.locals.studio, parsed.data));
   });
   app.get("/api/studios/:studio/assets", async (_req, res) => {
-    const studio = res.locals.studio as string;
-    let entry = mediaAccess.get(studio);
-    if (!entry || entry.expires < Date.now() + 3600_000) {
-      const expires = Date.now() + 24 * 3600_000;
-      entry = {
-        token: auth.sign({
-          studio,
-          role: "renderer",
-          identity: "media",
-          name: "Media",
-          purpose: "media",
-          expires,
-        }),
-        expires,
-      };
-      mediaAccess.set(studio, entry);
-    }
-    const access = entry.token;
-    res.json({
-      assets: (await media.scan()).map((a) => ({
-        ...a,
-        url: `${a.url}?access=${encodeURIComponent(access)}&v=${a.version}`,
-      })),
-    });
+    res.json({ assets: await mediaAssets(res.locals.studio) });
   });
   app.get("/media/:id", async (req, res) => {
     const claims =

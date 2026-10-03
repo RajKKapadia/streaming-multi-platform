@@ -323,6 +323,7 @@ export function ProgramCanvas({
   return (
     <div
       className="program-container"
+      data-layout={state.layout}
       ref={container}
       style={{ aspectRatio: "16 / 9", width: "100%", position: "relative", overflow: "hidden" }}
     >
