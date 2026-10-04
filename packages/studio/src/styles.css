@@ -1,4 +1,5 @@
 .program-camera {
+  container-type: size;
   overflow: hidden;
   background: #161c2a;
   border-radius: 12px;
@@ -6,6 +7,26 @@
 }
 .program-container:is([data-layout="solo"], [data-layout="split"]) .program-camera {
   border-radius: 0;
+}
+.program-camera::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: inset 0 0 0 5px #63e6be, inset 0 0 28px 8px #63e6be70;
+  opacity: 0;
+  transition: opacity 400ms ease-out;
+}
+.program-camera[data-speaking="true"]::after {
+  opacity: 1;
+  transition-duration: 120ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .program-camera::after {
+    transition: none;
+  }
 }
 .program-screen {
   overflow: hidden;
@@ -32,14 +53,20 @@
   font: 600 100px system-ui;
 }
 .program-name {
+  --name-inset: clamp(8px, 1.8cqw, 24px);
   position: absolute;
-  left: 24px;
-  bottom: 24px;
-  border-radius: 8px;
-  padding: 12px 24px;
+  left: var(--name-inset);
+  bottom: var(--name-inset);
+  box-sizing: border-box;
+  max-width: calc(100% - 2 * var(--name-inset));
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-radius: 0.25em;
+  padding: 0.3em 0.65em;
   background: #114be8;
   color: white;
-  font: 500 32px system-ui;
+  font: 500 clamp(16px, min(4cqw, 5cqh), 40px) / 1.2 system-ui;
 }
 .program-logo {
   position: absolute;

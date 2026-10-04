@@ -19,7 +19,7 @@ The default program and encoded output are **1920 × 1080 at 60 fps**, replacing
 - Request 1080p60 camera capture where supported and 60 fps screen capture where the browser supports it. Show actual track settings; lower-rate cameras, clips, or screen captures retain their original motion cadence even when encoded in a 60 fps output.
 - Destination profiles may override bitrate. The shared 6000 kbps profile is the initial default; do not silently reduce the program resolution or frame rate.
 - Group enabled destinations by encoding profile. Use one Egress per distinct profile, with multiple destination URLs when their settings match. All renderers consume the same program state and playback timeline.
-- X requires an ingest test against the user's actual account. Its English Producer documentation currently lists 1080p30 as the maximum, while some localized documentation lists 1080p and 60 fps separately. Do not promise universal X 1080p60 compatibility. Offer an explicit 1080p30 compatibility profile for X if testing requires it; it must not downgrade the main 1080p60 program.
+- X defaults to its 1080p30 compatibility profile at 9000 kbps with three-second keyframes, following legacy Producer's specifications. Live Studio replaces Producer; check Recommended Encoder Settings for the actual source before selecting the optional 1080p60 profile. X must not downgrade the main 1080p60 program, and actual ingestion remains an account-level acceptance check.
 - Treat 1080p60 delivery as an acceptance requirement: verify the received output and sustained frame delivery under the full participant/effects workload.
 
 References:
@@ -79,7 +79,7 @@ Support PNG/JPEG/WebP images; transparent PNG/WebP and animated GIF overlays; MP
 
 Playing a clip suspends music and effects. Completion or Stop restores the current stage and resumes paused music from its saved position. Ending an outro does not end the broadcast automatically. Clip playback must not change participants' microphone mute settings.
 
-Music, effects, and clip audio reach viewers. An optional host headphone monitor plays effects audio only and defaults off. Guests do not receive effects audio in V1. Keep preview video elements muted; never monitor the host's own microphone.
+Music, effects, and clip audio reach viewers and play locally for the host and guests by default. Each participant can mute their own media monitoring with the headphone button without changing the program. Offer Enable audio when the browser blocks playback. Keep camera and screen preview video elements muted; never monitor the local microphone.
 
 ## Architecture, state, and API
 

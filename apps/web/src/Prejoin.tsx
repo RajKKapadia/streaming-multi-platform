@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Camera,
@@ -36,7 +36,6 @@ export function Prejoin({
     [passcode, setPasscode] = useState(""),
     [busy, setBusy] = useState(false),
     [settings, setSettings] = useState(false),
-    [assets, setAssets] = useState<Asset[]>([]),
     [error, setError] = useState(""),
     [issues, setIssues] = useState<string[]>([]),
     [session, setSession] = useState<{ studio: string; role: string } | null>(null),
@@ -49,21 +48,25 @@ export function Prejoin({
       .catch((e) => setError(e.message));
     void api<{ studio: string; role: string } | null>("/session").then(setSession);
   }, []);
-  useEffect(() => {
-    setAssets([]);
-    if (!settings || (!invite && session?.studio !== studioId)) return;
-    let alive = true;
-    void api<{ assets: Asset[] }>(studioPath(studioId, "backgrounds", invite ?? undefined))
-      .then((data) => {
-        if (alive) setAssets(data.assets);
-      })
-      .catch((e) => {
-        if (alive) setError(e.message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [settings, studioId, invite, session?.studio]);
+  const loadBackgrounds = useCallback(async () => {
+    if (!invite && session?.studio !== studioId) {
+      if (!preferences.name.trim() || !passcode)
+        throw new Error(
+          "Enter your display name and host passcode on setup, then reopen Settings to load shared backgrounds.",
+        );
+      setSession(
+        await api<{ studio: string; role: string }>("/session", {
+          studio: studioId,
+          name: preferences.name,
+          passcode,
+        }),
+      );
+    }
+    const data = await api<{ assets: Asset[] }>(
+      studioPath(studioId, "backgrounds", invite ?? undefined),
+    );
+    return data.assets;
+  }, [studioId, invite, session?.studio, preferences.name, passcode]);
   useEffect(() => {
     const sync = () => {
       setCamMuted(!!capture.camera?.isMuted);
@@ -295,7 +298,7 @@ export function Prejoin({
         open={settings}
         onClose={() => setSettings(false)}
         capture={capture}
-        assets={assets}
+        loadBackgrounds={loadBackgrounds}
         autoEnableCamera
       />
     </div>

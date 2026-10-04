@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Broadcast asset preview</title>
+<style>
+  * { box-sizing: border-box }
+  body { margin:0; padding:36px; background:#090f1b; color:#edf4ff; font:16px system-ui,sans-serif }
+  main { max-width:1100px; margin:auto }
+  h1 { margin:0 0 8px; font-size:32px } p { color:#a7b6ca; line-height:1.5 }
+  video { width:100%; border-radius:14px; background:#020612; display:block }
+  .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:18px 0 32px }
+  button { background:#14395d; color:#e9f6ff; border:1px solid #355477; padding:10px 15px; border-radius:8px; cursor:pointer }
+  button:focus-visible { outline:3px solid #65d8ff; outline-offset:3px }
+  #status { color:#8fdbff; font-size:14px; font-variant-numeric:tabular-nums }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:22px }
+  figure { margin:0; border:1px solid #283c56; border-radius:12px; overflow:hidden }
+  .stage { aspect-ratio:16/9; position:relative; background:linear-gradient(40deg,#253450,#111c2e); display:grid; place-items:center }
+  .stage span { color:#7a96b5; font-size:20px; font-weight:600 }
+  .stage img { width:100%; height:100%; object-fit:contain; position:absolute; inset:0 }
+  .light .stage { background:linear-gradient(40deg,#e3eaf3,#f9fbff) }
+  .light .stage span { color:#bccbdc }
+  figcaption { padding:15px; font-size:14px; color:#bbcce2 }
+  @media(max-width:700px) { body { padding:18px } .grid { grid-template-columns:1fr } }
+</style>
+<main>
+  <h1>Broadcast assets</h1>
+  <p>One-minute countdown, two celebration effects, and two like/share/subscribe variations. All assets are silent.</p>
+  <video id="countdown" controls preload="metadata" poster="countdown-start.jpg" src="../../media/clips/starting-soon-1-minute.mp4"></video>
+  <div class="controls">
+    <button id="play">Play countdown</button>
+    <button id="start">Start: 01:00</button>
+    <button id="middle">Halfway: 00:30</button>
+    <button id="finish">Final frame: 00:00</button>
+    <span id="status">Loading video metadata…</span>
+  </div>
+  <p>Transparent overlays run above the simulated stage below. In the studio, click an overlay to show it and click again to hide it.</p>
+  <div class="controls"><button id="theme">Toggle light/dark stage</button><button id="replay">Replay overlays</button></div>
+  <section class="grid">
+    <figure><div class="stage"><span>YOUR LIVE VIDEO</span><img alt="Transparent celebration confetti" src="../../media/overlays/celebration-confetti.webp"></div><figcaption>Celebration · Confetti burst · 5.4s loop</figcaption></figure>
+    <figure><div class="stage"><span>YOUR LIVE VIDEO</span><img alt="Transparent celebration gold sparkles" src="../../media/overlays/celebration-gold-sparkles.webp"></div><figcaption>Celebration · Gold sparkles and fireworks · 5.4s loop</figcaption></figure>
+    <figure><div class="stage"><span>YOUR LIVE VIDEO</span><img alt="Transparent minimal like share subscribe" src="../../media/overlays/like-share-subscribe-minimal.webp"></div><figcaption>Like / share / subscribe · Minimal clicks · 7.6s loop</figcaption></figure>
+    <figure><div class="stage"><span>YOUR LIVE VIDEO</span><img alt="Transparent playful like share subscribe" src="../../media/overlays/like-share-subscribe-playful.webp"></div><figcaption>Like / share / subscribe · Playful bounce · 7.6s loop</figcaption></figure>
+  </section>
+</main>
+<script>
+const video = document.querySelector('#countdown');
+const status = document.querySelector('#status');
+function report() { status.textContent = `${video.currentTime.toFixed(2)} / ${video.duration.toFixed(2)} seconds · ${video.videoWidth} × ${video.videoHeight}`; }
+video.addEventListener('loadedmetadata', report);
+video.addEventListener('timeupdate', report);
+video.addEventListener('error', () => { status.textContent = 'Video playback error'; });
+document.querySelector('#play').onclick = () => video.play();
+function seek(time) { video.pause(); video.currentTime = time; }
+document.querySelector('#start').onclick = () => seek(0);
+document.querySelector('#middle').onclick = () => seek(30);
+document.querySelector('#finish').onclick = () => seek(59.99);
+document.querySelector('#theme').onclick = () => document.body.classList.toggle('light');
+document.querySelector('#replay').onclick = () => document.querySelectorAll('.stage img').forEach(img => { const url = new URL(img.src); url.searchParams.set('replay', Date.now()); img.src = url; });
+</script>
+</html>

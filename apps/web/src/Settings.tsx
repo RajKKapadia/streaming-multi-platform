@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Mic, Sparkles, Settings as SettingsIcon, Headphones } from "lucide-react";
 import { Dialog, Button, Input, Select, Switch } from "@studio/ui";
 import { VideoTrack } from "@studio/rendering";
@@ -9,22 +9,50 @@ export function Settings({
   open,
   onClose,
   capture,
-  assets,
+  loadBackgrounds,
   autoEnableCamera = false,
 }: {
   open: boolean;
   onClose: () => void;
   capture: Capture;
-  assets: Asset[];
+  loadBackgrounds: () => Promise<Asset[]>;
   autoEnableCamera?: boolean;
 }) {
   const p = usePreferences(),
     [tab, setTab] = useState("camera"),
     [error, setError] = useState(""),
+    [backgrounds, setBackgrounds] = useState<Asset[]>([]),
+    [backgroundsError, setBackgroundsError] = useState(""),
+    [loadingBackgrounds, setLoadingBackgrounds] = useState(false),
     [loadingImage, setLoadingImage] = useState(false),
     [saving, setSaving] = useState(false);
+  const backgroundRequest = useRef(0);
   const settings = capture.camera?.mediaStreamTrack.getSettings();
-  const backgrounds = assets.filter((a) => a.category === "backgrounds");
+  const refreshBackgrounds = useCallback(async () => {
+    const request = ++backgroundRequest.current;
+    setLoadingBackgrounds(true);
+    setBackgroundsError("");
+    try {
+      const assets = await loadBackgrounds();
+      if (request === backgroundRequest.current)
+        setBackgrounds(assets.filter((a) => a.category === "backgrounds"));
+    } catch (e) {
+      if (request === backgroundRequest.current)
+        setBackgroundsError(
+          e instanceof Error ? e.message : "The background library could not be loaded.",
+        );
+    } finally {
+      if (request === backgroundRequest.current) setLoadingBackgrounds(false);
+    }
+  }, [loadBackgrounds]);
+  useEffect(() => {
+    if (!open) return;
+    setBackgrounds([]);
+    void refreshBackgrounds();
+    return () => {
+      backgroundRequest.current++;
+    };
+  }, [open, refreshBackgrounds]);
   const chooseImage = async (file?: File) => {
     if (!file) return;
     setLoadingImage(true);
@@ -60,7 +88,7 @@ export function Settings({
         (autoEnableCamera && p.effect !== "none" ? await capture.enable("camera") : undefined);
       if (p.effect !== "none" && !camera)
         throw new Error("Enable your camera to apply a camera effect. Check camera permissions.");
-      await applyDevices(camera, capture.microphone, assets);
+      await applyDevices(camera, capture.microphone, backgrounds);
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -205,7 +233,10 @@ export function Settings({
                     <Select
                       value={p.localBackground ? "local" : p.backgroundId}
                       disabled={
-                        loadingImage || saving || (!p.localBackground && !backgrounds.length)
+                        loadingImage ||
+                        saving ||
+                        loadingBackgrounds ||
+                        (!p.localBackground && !backgrounds.length)
                       }
                       onChange={(e) => {
                         if (e.target.value !== "local")
@@ -213,7 +244,13 @@ export function Settings({
                       }}
                     >
                       <option value="">
-                        {backgrounds.length ? "Choose an image" : "No library images available"}
+                        {loadingBackgrounds
+                          ? "Loading backgrounds…"
+                          : backgrounds.length
+                            ? "Choose an image"
+                            : backgroundsError
+                              ? "Background library unavailable"
+                              : "No library images available"}
                       </option>
                       {p.localBackground && <option value="local">{p.localBackground.name}</option>}
                       {backgrounds.map((a) => (
@@ -223,6 +260,18 @@ export function Settings({
                       ))}
                     </Select>
                   </label>
+                  <Button
+                    variant="secondary"
+                    disabled={loadingBackgrounds || saving}
+                    onClick={() => void refreshBackgrounds()}
+                  >
+                    {loadingBackgrounds ? "Loading backgrounds…" : "Refresh backgrounds"}
+                  </Button>
+                  {backgroundsError && (
+                    <p role="alert" className="error">
+                      {backgroundsError}
+                    </p>
+                  )}
                   <label>
                     Choose image from computer
                     <Input
@@ -245,8 +294,8 @@ export function Settings({
               )}
               <p className="hint">
                 Camera effects are included in your published video. Choose an image, then apply
-                settings. Shared library images are loaded when you open setup settings while signed
-                in or using a guest invitation.
+                settings. Shared library images load when Settings opens. After adding images, click
+                Refresh backgrounds to update the list.
               </p>
             </>
           )}
@@ -265,7 +314,14 @@ export function Settings({
             <Button variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={saving || loadingImage}>
+            <Button
+              onClick={save}
+              disabled={
+                saving ||
+                loadingImage ||
+                (p.effect === "image" && !p.localBackground && loadingBackgrounds)
+              }
+            >
               {saving ? "Applying…" : "Apply settings"}
             </Button>
           </div>

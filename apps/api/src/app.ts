@@ -3,7 +3,12 @@ import cookieParser from "cookie-parser";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
-import { commandSchema, destinationSchema, visualSchema } from "@studio/contracts";
+import {
+  commandSchema,
+  destinationSchema,
+  messageInputSchema,
+  visualSchema,
+} from "@studio/contracts";
 import { configurationIssues, type Config } from "./config";
 import { Auth, matchesPasscode, type Claims } from "./auth";
 import { MediaLibrary } from "./media";
@@ -50,8 +55,9 @@ export function createApp(config: Config, gateway?: Gateway) {
       const origin = req.headers.origin;
       const allowed = new Set([
         new URL(config.publicUrl).origin,
-        "http://localhost:3003",
-        "http://127.0.0.1:3003",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        ...(config.production ? [] : ["http://localhost:5173", "http://127.0.0.1:5173"]),
       ]);
       if (!allowed.has(origin))
         return res.status(403).json({ error: "This request origin is not allowed." });
@@ -213,6 +219,29 @@ export function createApp(config: Config, gateway?: Gateway) {
     const parsed = commandSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Invalid studio command." });
     res.json(await service.command(res.locals.studio, parsed.data));
+  });
+  const messaging: express.RequestHandler = (_req, res, next) => {
+    const c = res.locals.claims as Claims;
+    if (c.purpose !== "session" || (c.role !== "host" && c.role !== "guest"))
+      return res.status(403).json({ error: "Messages are only available to the host and guests." });
+    next();
+  };
+  app.get("/api/studios/:studio/messages", messaging, (_req, res) =>
+    res.json(service.messages(res.locals.studio)),
+  );
+  app.post("/api/studios/:studio/messages", messaging, async (req, res) => {
+    const parsed = messageInputSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({ error: "Enter a message between 1 and 2,000 characters." });
+    const c = res.locals.claims as Claims;
+    if (c.role !== "host" && c.role !== "guest") return res.status(403).end();
+    res.json(
+      await service.sendMessage(
+        c.studio,
+        { identity: c.identity, name: c.name, role: c.role },
+        parsed.data.text,
+      ),
+    );
   });
   app.get("/api/studios/:studio/assets", async (_req, res) => {
     res.json({ assets: await mediaAssets(res.locals.studio) });

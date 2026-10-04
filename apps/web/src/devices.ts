@@ -187,6 +187,7 @@ export function useRoomUpdates(room: Room | null) {
       "localTrackUnpublished",
       "trackPublished",
       "trackUnpublished",
+      "activeSpeakersChanged",
       "connectionStateChanged",
       "audioPlaybackChanged",
     ] as const;

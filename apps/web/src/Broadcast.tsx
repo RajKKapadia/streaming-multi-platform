@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Room, RoomEvent } from "livekit-client";
-import EgressHelper from "@livekit/egress-sdk";
+// The SDK's CommonJS entry nests its default export in the production bundle.
+import EgressHelper from "@livekit/egress-sdk/src/index";
 import { ProgramCanvas, roomSources } from "@studio/rendering";
 import { initialState, stateSchema, type Asset, type StudioState } from "@studio/contracts";
 import { api, studioPath } from "./api";
@@ -98,7 +99,10 @@ export function Broadcast() {
         await instance.disconnect();
         return;
       }
+      await instance.startAudio();
       setRoom(instance);
+      // Studio state controls layout; the SDK still needs a recorder-layout callback.
+      EgressHelper.onLayoutChanged(() => {});
       EgressHelper.setRoom(instance);
       // Wait for every existing track to subscribe and for React to paint before capture starts.
       const deadline = Date.now() + 15000;

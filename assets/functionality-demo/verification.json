@@ -1,0 +1,105 @@
+{
+  "dimensions": [
+    1280,
+    856
+  ],
+  "fps": 12,
+  "rendered_frames": 375,
+  "duration_seconds": 31.25,
+  "loop": "forever",
+  "gif_bytes": 2723252,
+  "mp4_bytes": 1032057,
+  "capture_source": "Actual app UI using built-in interface preview",
+  "broadcast_started": false,
+  "scenes": [
+    {
+      "title": "Broadcast Studio",
+      "chapter": "OVERVIEW",
+      "seconds": 1.8
+    },
+    {
+      "title": "Get ready before entering",
+      "chapter": "01 / SETUP",
+      "seconds": 2.4
+    },
+    {
+      "title": "Choose from eight stage layouts",
+      "chapter": "02 / LAYOUTS",
+      "seconds": 1.8
+    },
+    {
+      "title": "Put a speaker in the spotlight",
+      "chapter": "02 / LAYOUTS",
+      "seconds": 1.3
+    },
+    {
+      "title": "Feature a different camera",
+      "chapter": "02 / LAYOUTS",
+      "seconds": 1.3
+    },
+    {
+      "title": "Manage everyone in the studio",
+      "chapter": "03 / PEOPLE",
+      "seconds": 1.4
+    },
+    {
+      "title": "Move a guest backstage",
+      "chapter": "03 / PEOPLE",
+      "seconds": 1.8
+    },
+    {
+      "title": "Present with a shared screen",
+      "chapter": "04 / SCREEN",
+      "seconds": 1.8
+    },
+    {
+      "title": "Keep the presenter in the picture",
+      "chapter": "04 / SCREEN",
+      "seconds": 1.2
+    },
+    {
+      "title": "Give your program its own look",
+      "chapter": "05 / MEDIA",
+      "seconds": 2.0
+    },
+    {
+      "title": "Talk to everyone in the studio",
+      "chapter": "06 / MESSAGES",
+      "seconds": 2.2
+    },
+    {
+      "title": "Choose your capture settings",
+      "chapter": "07 / SETTINGS",
+      "seconds": 1.6
+    },
+    {
+      "title": "Add camera effects",
+      "chapter": "07 / SETTINGS",
+      "seconds": 1.8
+    },
+    {
+      "title": "Configure your YouTube output",
+      "chapter": "08 / DESTINATIONS",
+      "seconds": 1.8
+    },
+    {
+      "title": "Add Twitch to your destinations",
+      "chapter": "08 / DESTINATIONS",
+      "seconds": 1.4
+    },
+    {
+      "title": "Set up the X output",
+      "chapter": "08 / DESTINATIONS",
+      "seconds": 1.8
+    },
+    {
+      "title": "One program. Three destinations.",
+      "chapter": "OUTPUT WORKFLOW",
+      "seconds": 3.6
+    }
+  ],
+  "decoded_gif_frames": 375,
+  "decoded_gif_duration_seconds": 31.25,
+  "decoded_gif_loop": 0,
+  "all_gif_frames_decoded": true
+}

@@ -88,6 +88,7 @@ export class LiveKitGateway implements Gateway {
     return at.toJwt();
   }
   async start(name: string, renderUrl: string, urls: string[], e: Encoding) {
+    await verifyRenderer(renderUrl);
     const encodingOptions = createEncodingOptions(e);
     if (typeof this.egress.startEgress === "function")
       return this.egress.startEgress(
@@ -118,6 +119,35 @@ export class LiveKitGateway implements Gateway {
     await this.egress.stopEgress(id);
   }
 }
+export class RendererUnavailableError extends Error {
+  constructor() {
+    super(
+      "The public program renderer is unreachable. Check PUBLIC_APP_URL, keep its HTTPS tunnel running, rebuild the app, and restart the API after changing the tunnel URL.",
+    );
+  }
+}
+export async function verifyRenderer(
+  renderUrl: string,
+  request: (input: string | URL, init?: RequestInit) => Promise<Response> = fetch,
+) {
+  try {
+    const url = new URL(renderUrl);
+    const studio = url.pathname.split("/").pop();
+    const manifestURL = new URL(`/api/studios/${studio}/assets`, url);
+    manifestURL.searchParams.set("access", url.searchParams.get("access") ?? "");
+    const response = await request(renderUrl, { signal: AbortSignal.timeout(10000) });
+    if (!response.ok || !response.headers.get("content-type")?.includes("text/html"))
+      throw new RendererUnavailableError();
+    const page = await response.text();
+    if (!page.includes('id="root"') || !page.includes("/assets/"))
+      throw new RendererUnavailableError();
+    const manifest = await request(manifestURL, { signal: AbortSignal.timeout(10000) });
+    if (!manifest.ok || !Array.isArray((await manifest.json()).assets))
+      throw new RendererUnavailableError();
+  } catch {
+    throw new RendererUnavailableError();
+  }
+}
 export function activeEgress(e: EgressInfo) {
   return [
     EgressStatus.EGRESS_STARTING,
@@ -136,6 +166,6 @@ export function createEncodingOptions(e: Encoding) {
     audioCodec: AudioCodec.AAC,
     audioBitrate: 128,
     audioFrequency: 48000,
-    keyFrameInterval: 2,
+    keyFrameInterval: e.keyframeInterval ?? 2,
   });
 }

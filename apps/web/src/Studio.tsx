@@ -24,9 +24,17 @@ import {
   Wifi,
   ArrowLeft,
   RefreshCw,
+  MessageSquare,
 } from "lucide-react";
 import { Button, Dialog, Input } from "@studio/ui";
-import { ProgramCanvas, VideoTrack, Voice, roomSources, type Source } from "@studio/rendering";
+import {
+  ProgramCanvas,
+  VideoTrack,
+  Voice,
+  roomSources,
+  startMediaAudio,
+  type Source,
+} from "@studio/rendering";
 import {
   layouts,
   type Asset,
@@ -43,6 +51,8 @@ import { api, studioPath } from "./api";
 import { usePreferences } from "./store";
 import { Settings } from "./Settings";
 import { MediaPanel } from "./MediaPanel";
+import { MessagesPanel, useStudioMessages } from "./MessagesPanel";
+import { PeoplePanel } from "./PeoplePanel";
 import { Destinations } from "./Destinations";
 import { useRoomUpdates, type Capture } from "./devices";
 function GlyphPerson({ x, y, size = 1 }: { x: number; y: number; size?: number }) {
@@ -151,10 +161,11 @@ export function Studio({
     [invite, setInvite] = useState(""),
     [inviting, setInviting] = useState(false),
     [copied, setCopied] = useState(false),
-    [monitor, setMonitor] = useState(false),
+    [monitor, setMonitor] = useState(true),
+    [audioBlocked, setAudioBlocked] = useState(false),
     [mediaBusy, setMediaBusy] = useState(false),
     [actionBusy, setActionBusy] = useState(false),
-    [panel, setPanel] = useState("media"),
+    [panel, setPanel] = useState(joinData?.role === "guest" ? "people" : "media"),
     [sidebarOpen, setSidebarOpen] = useState(true),
     [endDialog, setEndDialog] = useState(false);
   const [deviceBusy, setDeviceBusy] = useState(false);
@@ -175,7 +186,27 @@ export function Studio({
         })),
       ];
   const connected = preview || room?.state === "connected";
+  const identity = joinData?.identity ?? "host";
+  const chat = useStudioMessages({
+    studioId,
+    identity,
+    name: joinData?.name || preferences.name || "You",
+    host,
+    preview,
+    connected,
+    visible: sidebarOpen && panel === "messages",
+  });
   const handleError = useCallback((message: string) => setError(message), []);
+  const handleAudioBlocked = useCallback(() => setAudioBlocked(true), []);
+  const enableAudio = async () => {
+    try {
+      await Promise.all([room?.startAudio(), startMediaAudio()]);
+      setAudioBlocked(false);
+      setError("");
+    } catch {
+      setError("Audio could not start. Check your browser audio permissions and try again.");
+    }
+  };
   const refresh = useCallback(async () => {
     if (preview) return;
     setMediaBusy(true);
@@ -188,6 +219,10 @@ export function Studio({
       setMediaBusy(false);
     }
   }, [studioId, preview]);
+  const loadBackgrounds = useCallback(async () => {
+    const data = await api<{ assets: Asset[] }>(studioPath(studioId, "backgrounds"));
+    return data.assets;
+  }, [studioId]);
   const refreshStatus = useCallback(async () => {
     if (!preview && host)
       try {
@@ -393,7 +428,8 @@ export function Studio({
       : capture.microphone,
   };
   const failed = status?.groups.some(
-    (g) => g.status === "failed" || g.destinations.some((d) => d.status === "failed"),
+    (g) =>
+      ["failed", "aborted"].includes(g.status) || g.destinations.some((d) => d.status === "failed"),
   );
   return (
     <div
@@ -433,9 +469,12 @@ export function Studio({
         </div>
         <div className="header-actions">
           {status?.live ? (
-            <span className="live-pill">
+            <span
+              className="live-pill"
+              title="Output status. Confirm viewer availability in each platform dashboard."
+            >
               <span />
-              LIVE
+              {status.groups.some((g) => g.status === "active") ? "SENDING" : "STARTING"}
             </span>
           ) : (
             <span className="ready-pill">
@@ -477,6 +516,15 @@ export function Studio({
           </button>
         </div>
       )}
+      {status?.live && host && (
+        <div className="preview-banner">
+          <Info size={15} />
+          <span>
+            Video output is running. Confirm the preview and Go live or Auto-start in X / YouTube.
+            Twitch starts automatically when it receives video.
+          </span>
+        </div>
+      )}
       {!connected && !preview && (
         <div className="connection-banner">
           <Wifi size={17} />
@@ -507,23 +555,26 @@ export function Studio({
           <div className="stage-heading">
             <span>
               <span className={`tiny-dot ${status?.live ? "red" : ""}`} />
-              {status?.live ? "Live program" : "Program preview"}
+              {status?.live ? "Outgoing program" : "Program preview"}
             </span>
             <span>
               1920 × 1080 <span className="divider-dot">·</span> 60 fps
             </span>
           </div>
-          <div className="stage-frame">
-            <ProgramCanvas
-              state={state}
-              sources={sources}
-              assets={assets}
-              clockOffset={offset}
-              effectsAudio={host && monitor}
-              onMediaError={handleError}
-            />
-            <span className="program-quality">1080p60</span>
-            {state.clip && <span className="clip-badge">CLIP PLAYING · LIVE MICS EXCLUDED</span>}
+          <div className="stage-preview">
+            <div className="stage-frame">
+              <ProgramCanvas
+                state={state}
+                sources={sources}
+                assets={assets}
+                clockOffset={offset}
+                effectsAudio={monitor}
+                onMediaError={handleError}
+                onAudioBlocked={handleAudioBlocked}
+              />
+              <span className="program-quality">1080p60</span>
+              {state.clip && <span className="clip-badge">CLIP PLAYING · LIVE MICS EXCLUDED</span>}
+            </div>
           </div>
           <div className="stage-options">
             <div className="layout-strip" aria-label="Program layouts">
@@ -683,119 +734,6 @@ export function Studio({
               An output needs attention. Open destinations to inspect its status.
             </button>
           )}
-          <footer className="studio-footer">
-            <span className="connection-label">
-              <span className="tiny-dot" />
-              {preview
-                ? "Preview mode"
-                : room?.state === "connected"
-                  ? "Connected to studio"
-                  : "Reconnecting…"}
-            </span>
-            <div className="bottom-controls">
-              <Button
-                variant={
-                  mic?.isMuted || (!room && capture.microphone?.isMuted) ? "danger" : "secondary"
-                }
-                size="icon"
-                title="Microphone (M)"
-                aria-label={mic?.isMuted ? "Unmute microphone" : "Toggle microphone"}
-                disabled={deviceBusy}
-                onClick={() => void toggle("mic")}
-              >
-                {mic?.isMuted || (!room && capture.microphone?.isMuted) ? (
-                  <MicOff size={19} />
-                ) : (
-                  <Mic size={19} />
-                )}
-              </Button>
-              <Button
-                variant={
-                  cam?.isMuted || (!room && capture.camera?.isMuted) ? "danger" : "secondary"
-                }
-                size="icon"
-                title="Camera (C)"
-                aria-label="Toggle camera"
-                disabled={deviceBusy}
-                onClick={() => void toggle("camera")}
-              >
-                {cam?.isMuted ? <CameraOff size={19} /> : <Camera size={19} />}
-              </Button>
-              <Button
-                variant={sharing ? "default" : "secondary"}
-                size="icon"
-                aria-label={sharing ? "Stop screen share" : "Share screen"}
-                aria-pressed={sharing}
-                title={sharing ? "Stop screen share" : "Share screen"}
-                disabled={deviceBusy || !connected}
-                onClick={() => void toggle("screen")}
-              >
-                <MonitorUp size={19} />
-              </Button>
-              {host && (
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  aria-label="Invite guests"
-                  onClick={() => void makeInvite()}
-                >
-                  <UserPlus size={19} />
-                </Button>
-              )}
-              <span className="control-separator" />
-              <Button
-                variant="secondary"
-                size="icon"
-                aria-label="Open settings"
-                onClick={() => setSettings(true)}
-              >
-                <SettingsIcon size={19} />
-              </Button>
-              {room && !room.canPlaybackAudio && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    void room
-                      .startAudio()
-                      .catch(() =>
-                        setError("Audio could not start. Check your browser audio permissions."),
-                      )
-                  }
-                >
-                  Enable audio
-                </Button>
-              )}
-              {host && (
-                <Button
-                  variant={monitor ? "default" : "secondary"}
-                  size="icon"
-                  aria-pressed={monitor}
-                  aria-label="Headphone effects monitor"
-                  title="Monitor effects in headphones"
-                  onClick={() => setMonitor(!monitor)}
-                >
-                  <Headphones size={19} />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Leave studio"
-                onClick={() => {
-                  onLeave();
-                  navigate(`/join/${studioId}`);
-                }}
-              >
-                <LogOut size={19} />
-              </Button>
-            </div>
-            <span className="source-capture">
-              {actual
-                ? `${actual.height}p · ${Math.round(actual.frameRate ?? 0)} fps camera`
-                : "Camera off"}
-            </span>
-          </footer>
         </main>
         {sidebarOpen &&
           (host && panel === "media" ? (
@@ -807,33 +745,23 @@ export function Studio({
               busy={mediaBusy}
               preview={preview}
             />
+          ) : panel === "messages" ? (
+            <MessagesPanel
+              chat={chat}
+              identity={identity}
+              connected={connected}
+              preview={preview}
+            />
           ) : (
-            <aside className="media-panel people-panel">
-              <div className="panel-header">
-                <strong>{host ? "People" : "Guest studio"}</strong>
-              </div>
-              <Users size={35} />
-              <h3>
-                {host ? "Make room for great conversations." : "Welcome to the conversation."}
-              </h3>
-              <p>
-                {host
-                  ? "Invite up to three guests. They join backstage until you add them to the program."
-                  : "Your camera and microphone are connected. The host will add you to the stage when it’s your turn."}
-              </p>
-              {host && (
-                <Button disabled={inviting} onClick={() => void makeInvite()}>
-                  <UserPlus size={16} />
-                  Invite guest
-                </Button>
-              )}
-              <p className="hint">
-                Program preview is muted.{" "}
-                {host
-                  ? "Your headphone monitor plays effects only."
-                  : "Guests hear room voices; program clips and music reach viewers."}
-              </p>
-            </aside>
+            <PeoplePanel
+              sources={sources}
+              state={state}
+              identity={identity}
+              host={host}
+              inviting={inviting}
+              invite={() => void makeInvite()}
+              command={command}
+            />
           ))}
         <nav className="panel-rail">
           {host && (
@@ -850,6 +778,8 @@ export function Studio({
             </button>
           )}
           <button
+            aria-label="People"
+            aria-pressed={panel === "people" && sidebarOpen}
             className={panel === "people" ? "active" : ""}
             onClick={() => {
               setPanel("people");
@@ -858,6 +788,21 @@ export function Studio({
           >
             <Users size={21} />
             <span>People</span>
+          </button>
+          <button
+            aria-label={chat.unread ? `Messages, ${chat.unread} unread` : "Messages"}
+            aria-pressed={panel === "messages" && sidebarOpen}
+            className={panel === "messages" ? "active" : ""}
+            onClick={() => {
+              setPanel("messages");
+              setSidebarOpen(true);
+            }}
+          >
+            <MessageSquare size={21} />
+            <span>Messages</span>
+            {chat.unread > 0 && (
+              <span className="message-unread">{chat.unread > 99 ? "99+" : chat.unread}</span>
+            )}
           </button>
           <button
             aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
@@ -871,6 +816,109 @@ export function Studio({
           </button>
         </nav>
       </div>
+      <footer className="studio-footer">
+        <span className="connection-label">
+          <span className="tiny-dot" />
+          {preview
+            ? "Preview mode"
+            : room?.state === "connected"
+              ? "Connected to studio"
+              : "Reconnecting…"}
+        </span>
+        <div className="bottom-controls">
+          <Button
+            variant={
+              mic?.isMuted || (!room && capture.microphone?.isMuted) ? "danger" : "secondary"
+            }
+            size="icon"
+            title="Microphone (M)"
+            aria-label={mic?.isMuted ? "Unmute microphone" : "Toggle microphone"}
+            disabled={deviceBusy}
+            onClick={() => void toggle("mic")}
+          >
+            {mic?.isMuted || (!room && capture.microphone?.isMuted) ? (
+              <MicOff size={19} />
+            ) : (
+              <Mic size={19} />
+            )}
+          </Button>
+          <Button
+            variant={cam?.isMuted || (!room && capture.camera?.isMuted) ? "danger" : "secondary"}
+            size="icon"
+            title="Camera (C)"
+            aria-label="Toggle camera"
+            disabled={deviceBusy}
+            onClick={() => void toggle("camera")}
+          >
+            {cam?.isMuted ? <CameraOff size={19} /> : <Camera size={19} />}
+          </Button>
+          <Button
+            variant={sharing ? "default" : "secondary"}
+            size="icon"
+            aria-label={sharing ? "Stop screen share" : "Share screen"}
+            aria-pressed={sharing}
+            title={sharing ? "Stop screen share" : "Share screen"}
+            disabled={deviceBusy || !connected}
+            onClick={() => void toggle("screen")}
+          >
+            <MonitorUp size={19} />
+          </Button>
+          {host && (
+            <Button
+              variant="secondary"
+              size="icon"
+              aria-label="Invite guests"
+              onClick={() => void makeInvite()}
+            >
+              <UserPlus size={19} />
+            </Button>
+          )}
+          <span className="control-separator" />
+          <Button
+            variant="secondary"
+            size="icon"
+            aria-label="Open settings"
+            onClick={() => setSettings(true)}
+          >
+            <SettingsIcon size={19} />
+          </Button>
+          {((room && !room.canPlaybackAudio) || (monitor && audioBlocked)) && (
+            <Button variant="secondary" size="sm" onClick={() => void enableAudio()}>
+              Enable audio
+            </Button>
+          )}
+          <Button
+            variant={monitor ? "default" : "secondary"}
+            size="icon"
+            aria-pressed={monitor}
+            aria-label="Hear media audio"
+            title={
+              monitor
+                ? "Mute music, sounds, and clips for yourself"
+                : "Hear music, sounds, and clips in headphones"
+            }
+            onClick={() => setMonitor(!monitor)}
+          >
+            <Headphones size={19} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Leave studio"
+            onClick={() => {
+              onLeave();
+              navigate(`/join/${studioId}`);
+            }}
+          >
+            <LogOut size={19} />
+          </Button>
+        </div>
+        <span className="source-capture">
+          {actual
+            ? `${actual.height}p · ${Math.round(actual.frameRate ?? 0)} fps camera`
+            : "Camera off"}
+        </span>
+      </footer>
       {room &&
         sources
           .filter((s) => s.identity !== room.localParticipant.identity)
@@ -879,7 +927,7 @@ export function Studio({
         open={settings}
         onClose={() => setSettings(false)}
         capture={activeCapture}
-        assets={assets}
+        loadBackgrounds={loadBackgrounds}
       />
       <Destinations
         open={destinations}

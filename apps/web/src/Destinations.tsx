@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Radio, Eye, EyeOff, ExternalLink } from "lucide-react";
 import { Button, Dialog, Input, Select, Switch } from "@studio/ui";
 import {
-  defaultEncoding,
+  defaultDestinationURLs,
+  defaultPlatformEncoding,
   platformIds,
   type Destination,
   type PublicDestination,
@@ -45,9 +46,9 @@ export function Destinations({
         platformIds.map((platform) => ({
           platform,
           enabled: false,
-          url: "",
+          url: defaultDestinationURLs[platform],
           hasKey: false,
-          encoding: { ...defaultEncoding },
+          encoding: defaultPlatformEncoding(platform),
         })),
       );
     else
@@ -126,23 +127,39 @@ export function Destinations({
             </div>
           </div>
           <p className="hint">
-            Create a broadcast in your platform dashboard, then copy its ingest URL and stream key.
+            {selected === "twitch"
+              ? "Copy your Primary Stream key from Twitch → Settings → Stream. The server address is supplied automatically. Twitch goes live when it receives your video."
+              : selected === "youtube"
+                ? "Open YouTube Studio → Go live → Stream and copy the stream key for your broadcast. The standard secure server address is supplied automatically."
+                : "Create or select a source in X Live Studio, then copy that source’s server URL and secret stream key into the separate fields below."}
           </p>
-          <label>
-            RTMP / RTMPS server URL
-            <Input
-              value={current.url}
-              placeholder={
-                selected === "youtube"
-                  ? "rtmps://a.rtmps.youtube.com/live2"
-                  : selected === "twitch"
-                    ? "rtmp://live.twitch.tv/app"
-                    : "Your X Producer ingest URL"
-              }
-              disabled={!!status?.live}
-              onChange={(e) => change({ url: e.target.value })}
-            />
-          </label>
+          {selected === "x" ? (
+            <label>
+              RTMP / RTMPS server URL
+              <Input
+                value={current.url}
+                placeholder="Your X source server URL (without the stream key)"
+                disabled={!!status?.live}
+                onChange={(e) => change({ url: e.target.value })}
+              />
+            </label>
+          ) : (
+            <details className="destination-server" key={selected}>
+              <summary>Advanced server settings · optional</summary>
+              <label>
+                RTMP / RTMPS server URL
+                <Input
+                  value={current.url}
+                  placeholder={defaultDestinationURLs[selected]}
+                  disabled={!!status?.live}
+                  onChange={(e) => change({ url: e.target.value })}
+                />
+              </label>
+              <p className="hint">
+                Leave blank to use the standard server, or paste a custom ingest address.
+              </p>
+            </details>
+          )}
           <label>
             Stream key
             <div className="key-input">
@@ -177,8 +194,10 @@ export function Destinations({
                   })
                 }
               >
-                <option value="60">1080p60</option>
                 {selected === "x" && <option value="30">1080p30 · X compatibility</option>}
+                <option value="60">
+                  {selected === "x" ? "1080p60 · check X source support" : "1080p60"}
+                </option>
               </Select>
             </label>
             <label>
@@ -198,12 +217,13 @@ export function Destinations({
           </div>
           <div className="encoding-note">
             <Radio size={16} />
-            <span>H.264 Main · AAC 128 kbps · 48 kHz · 2s keyframes</span>
+            <span>H.264 Main · AAC 128 kbps · 48 kHz · {selected === "x" ? 3 : 2}s keyframes</span>
           </div>
-          {selected === "x" && (
+          {selected !== "twitch" && (
             <p className="platform-note">
-              Test X with your actual account. If its ingest rejects 60 fps, select the 30 fps
-              compatibility profile. Other outputs stay at 60 fps.
+              {selected === "x"
+                ? "Enable X, save, then click Go live in this studio to send video. Wait for the preview in X Live Studio before clicking Go Live there (or use its auto-start setting). If X is waiting for a stream, check the output status below. The default 1080p30 profile works with legacy Producer; check your source’s Recommended Encoder Settings before selecting 60 fps."
+                : "Enable YouTube, save, then click Go live in this studio. Wait for the preview in YouTube Studio and click Go live there, or enable Auto-start for that broadcast. A saved stream key alone does not send video."}
             </p>
           )}
           {status?.groups.flatMap((g) =>
@@ -212,7 +232,8 @@ export function Destinations({
               .map((d, i) => (
                 <p className={`output-status ${d.status}`} key={`${g.id}-${i}`}>
                   <span className="tiny-dot" />
-                  {d.status} · {g.encoding.fps} fps{d.error && <span>{d.error}</span>}
+                  {d.status === "active" ? "Sending video" : d.status} · {g.encoding.fps} fps
+                  {d.error && <span>{d.error}</span>}
                 </p>
               )),
           )}
@@ -225,7 +246,7 @@ export function Destinations({
                 ? "https://studio.youtube.com"
                 : selected === "twitch"
                   ? "https://dashboard.twitch.tv"
-                  : "https://producer.x.com"
+                  : "https://x.com/i/live-studio"
             }
           >
             Open {platformNames[selected]} dashboard

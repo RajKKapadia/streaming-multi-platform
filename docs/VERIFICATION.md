@@ -33,3 +33,31 @@ Two isolated Chrome sessions connected to a separate room in the configured Live
 - A 390 × 844 mobile viewport with no horizontal page overflow.
 
 `stage-layout-options.png` shows the updated controls. These checks verify application behavior and actual LiveKit track transport using simulated sources. They do not verify physical camera/microphone hardware, a browser's native screen-picker UI, screen audio, or platform broadcasting. The originally reported physical camera loss was not reproduced in the isolated sessions.
+
+## Broadcast fixes — 2026-10-03
+
+Read-only inspection of the two recent LiveKit Egress jobs found both aborted with `Start signal not received` (412) and no stream results. Both requests referenced a previous Cloudflare tunnel, whose renderer API currently returns a 530 origin DNS error. This does not establish whether that tunnel was reachable at the original start time. The current configured tunnel successfully serves the built application, authenticated renderer state, and media manifest.
+
+A browser check of the current production renderer also reproduced `getLiveKitURL is not a function`: the Egress SDK's CommonJS entry produced a nested default export in the production bundle. Importing the SDK's shipped TypeScript source fixed the module interop and removed its duplicate client bundle. After rebuilding, Chrome loaded the renderer through the current public HTTPS tunnel with a short-lived hidden recorder token, connected to LiveKit, and logged `START_RECORDING`. No broadcast error was present. This check joined a renderer only; it did not launch a cloud Egress job or send RTMP video to a platform.
+
+The API now checks the public renderer HTML and authenticated manifest before starting Egress. Aborted jobs and renderer startup failures report failed outputs with safe setup guidance. The studio labels running outputs as SENDING rather than claiming platform publication.
+
+Twitch and YouTube have built-in server addresses with optional overrides, and require only their stream keys for the standard RTMP/RTMPS setup. X retains its source-specific URL and defaults to a separate 1080p30 / 9000 kbps profile with three-second keyframes. YouTube/Twitch retain 1080p60 and two-second keyframes. Browser checks confirmed the three destination forms, optional server controls, X profile defaults, and the instructions to start video here before confirming the preview and Go live / Auto-start in X or YouTube.
+
+Build and all workspace type checks passed; lint passed without warnings. All 26 repository tests passed with local networking enabled, including regressions for default servers, key preservation, independent X encoding, renderer preflight, aborted-job reporting, and queued-output status. The first sandboxed test run could not bind its temporary localhost port; the native rerun passed. The built frontend was served by the existing API. After verifying that no outputs were active and no keys or enabled destinations were saved, the idle API was restarted to load the new defaults and preflight check.
+
+The renderer also registers the SDK's recorder-layout callback while continuing to use studio state for program layout. A second public-renderer check supplied recorder layout metadata, matching Egress's metadata handling.
+
+Received video, audio, and platform-side Go Live activation on Twitch, X, and YouTube remain actual-account acceptance checks. No public platform broadcast was created during this verification.
+
+## Studio fit and media audio — 2026-10-04
+
+The studio preview now fits the height left by the People row and layout controls, with a 16:9 frame. Participant cards and spacing are smaller. The device toolbar sits outside the scrolling workspace. Chrome checks at 2176 × 1283, 1920 × 1080, 1440 × 900, 1366 × 768, 1024 × 768, and 390 × 844 found no stage or document vertical overflow and kept the controls visible. The checks also covered simulated output-warning and live-output banners. Final desktop/mobile preview checks found no horizontal page overflow, and mobile header buttons stayed within the viewport.
+
+Before the fix, isolated real LiveKit host and guest sessions reproduced music advancing with both local media players muted. Media monitoring now starts enabled for both roles; each participant's headphone button affects only their own music, sounds, and clips. The host's microphone is still excluded from local monitoring. The broadcast renderer explicitly starts room audio before signaling recording readiness.
+
+Chrome checks against the rebuilt production bundle found unmuted, playing music with nonzero decoded PCM signal in the host, guest, and standalone broadcast renderer. Shared pause/resume worked in all three. Muting the host's local media left the guest and renderer unmuted. A simulated browser autoplay denial exposed Enable audio; clicking it resumed the media and cleared that control. No page errors were observed. Clock and state updates no longer tear down and pause an unchanged media player, and cancelled play requests are retried without treating them as codec or permission failures.
+
+All 34 repository tests passed with local networking enabled. Workspace type checks, lint, production build, and whitespace checks passed. The Vite SDK chunk-size warning remains unchanged. Verification used isolated studios and did not publish to any streaming destination or use physical microphone/camera devices. PCM checks establish decoded browser audio, not physical speaker output or platform reception.
+
+At the final connectivity check, the configured public tunnel returned Cloudflare 530 (origin DNS error), and the production API on port 3001 was stopped. A temporary tunnel to the isolated verification server was opened, but automatic approval review rejected testing the user's actual media through it because that would transmit potentially private media and authenticated traffic through Cloudflare. The temporary tunnel was closed. Public-tunnel playback and actual platform audio receipt remain unverified; the production app and a reachable public URL are required for that acceptance check.

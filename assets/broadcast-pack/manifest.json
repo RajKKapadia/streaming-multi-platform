@@ -1,0 +1,70 @@
+{
+  "background_canva_media_id": "MAHW9i45KMc",
+  "assets": [
+    {
+      "file": "media/clips/starting-soon-1-minute.mp4",
+      "duration_seconds": 60,
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "fps": 30,
+      "audio": false,
+      "timer": "01:00 at start; updates at each second; 00:00 on final frame",
+      "sha256": "d58f7a7bfe218287d0260b25b7a09e8cc7665f398bf8bce9f43360207abd12c9",
+      "size_bytes": 1420153
+    },
+    {
+      "file": "media/overlays/celebration-confetti.webp",
+      "duration_seconds": 5.4,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "fps": 25,
+      "alpha": true,
+      "loop": true,
+      "sha256": "991d755a77f46c0196d39156f45b3451d48cb4e81b0ee5b212557030ae48e25a",
+      "size_bytes": 299584
+    },
+    {
+      "file": "media/overlays/celebration-gold-sparkles.webp",
+      "duration_seconds": 5.4,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "fps": 25,
+      "alpha": true,
+      "loop": true,
+      "sha256": "0241b25eec6d81839601e5f361f23683b0fce5e681359f21144a6c05f230c03d",
+      "size_bytes": 225730
+    },
+    {
+      "file": "media/overlays/like-share-subscribe-minimal.webp",
+      "duration_seconds": 7.6,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "fps": 25,
+      "alpha": true,
+      "loop": true,
+      "sha256": "1443b4e5e58d5cb4808696bc50819768f424a68e92ea5ab954639e2568ce382f",
+      "size_bytes": 115502
+    },
+    {
+      "file": "media/overlays/like-share-subscribe-playful.webp",
+      "duration_seconds": 7.6,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "fps": 25,
+      "alpha": true,
+      "loop": true,
+      "sha256": "0649e7643946c17cba8a0cf0461e8a840bbeaad816938b867472821826fdaa28",
+      "size_bytes": 386748
+    }
+  ]
+}

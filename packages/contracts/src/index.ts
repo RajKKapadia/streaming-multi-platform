@@ -294,6 +294,24 @@ export type ParticipantInfo = {
   microphone: boolean;
   screenSid: string | null;
 };
+export const messageLimit = 2000;
+export const messageHistoryLimit = 100;
+export const messageInputSchema = z.object({
+  text: z.string().trim().min(1).max(messageLimit),
+});
+export type StudioMessage = {
+  id: string;
+  identity: string;
+  name: string;
+  role: "host" | "guest";
+  text: string;
+  sentAt: number;
+};
+export type MessagesSnapshot = {
+  sessionId: string;
+  revision: number;
+  messages: StudioMessage[];
+};
 export type JoinResponse = {
   identity: string;
   name: string;
@@ -308,11 +326,22 @@ export const encodingSchema = z.object({
   height: z.literal(1080),
   fps: z.union([z.literal(30), z.literal(60)]),
   bitrate: z.number().int().min(2500).max(20000),
+  keyframeInterval: z.union([z.literal(2), z.literal(3)]).optional(),
 });
 export type Encoding = z.infer<typeof encodingSchema>;
 export const defaultEncoding: Encoding = { width: 1920, height: 1080, fps: 60, bitrate: 6000 };
 export const platformIds = ["youtube", "twitch", "x"] as const;
 export type Platform = (typeof platformIds)[number];
+export const defaultDestinationURLs: Record<Platform, string> = {
+  youtube: "rtmps://a.rtmps.youtube.com:443/live2",
+  twitch: "rtmp://live.twitch.tv/app",
+  x: "",
+};
+export function defaultPlatformEncoding(platform: Platform): Encoding {
+  return platform === "x"
+    ? { ...defaultEncoding, fps: 30, bitrate: 9000, keyframeInterval: 3 }
+    : { ...defaultEncoding, keyframeInterval: 2 };
+}
 export const destinationSchema = z.object({
   platform: z.enum(platformIds),
   enabled: z.boolean(),

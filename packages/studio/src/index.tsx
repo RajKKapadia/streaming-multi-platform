@@ -24,6 +24,7 @@ export type Source = {
   microphone?: Track;
   screenAudio?: Track;
   cameraMuted?: boolean;
+  isSpeaking?: boolean;
 };
 export function programVoices(state: StudioState, sources: Source[]): Track[] {
   if (state.clip) return [];
@@ -38,16 +39,18 @@ export function roomSources(room: Room): Source[] {
 }
 function sourceFor(p: Participant): Source {
   const camera = p.getTrackPublication(Track.Source.Camera),
-    screen = p.getTrackPublication(Track.Source.ScreenShare);
+    screen = p.getTrackPublication(Track.Source.ScreenShare),
+    microphone = p.getTrackPublication(Track.Source.Microphone);
   return {
     identity: p.identity,
     name: p.name || p.identity,
     camera: camera?.track,
     screen: screen?.isMuted ? undefined : screen?.track,
     screenSid: screen?.isMuted ? undefined : screen?.trackSid,
-    microphone: p.getTrackPublication(Track.Source.Microphone)?.track,
+    microphone: microphone?.track,
     screenAudio: p.getTrackPublication(Track.Source.ScreenShareAudio)?.track,
     cameraMuted: camera?.isMuted,
+    isSpeaking: p.isSpeaking && !!microphone?.track && !microphone.isMuted,
   };
 }
 export function VideoTrack({
@@ -101,9 +104,15 @@ export function Voice({ track }: { track: Track }) {
   }, [track]);
   return <audio ref={ref} autoPlay />;
 }
+export async function startMediaAudio() {
+  const media = document.querySelectorAll<HTMLMediaElement>(
+    '.program-container [data-media-playback="playing"]',
+  );
+  await Promise.all([...media].filter((el) => !el.muted).map((el) => el.play()));
+}
 function Camera({ source, style }: { source?: Source; style: CSSProperties }) {
   return (
-    <div className="program-camera" style={style}>
+    <div className="program-camera" data-speaking={source?.isSpeaking || undefined} style={style}>
       {source?.camera && !source.cameraMuted ? (
         <VideoTrack track={source.camera} />
       ) : (
@@ -132,6 +141,7 @@ export function SyncedMedia({
   clockOffset,
   audio,
   onError,
+  onAudioBlocked,
   onReady,
 }: {
   playback: Playback;
@@ -139,18 +149,22 @@ export function SyncedMedia({
   clockOffset: number;
   audio: boolean;
   onError?: (message: string) => void;
+  onAudioBlocked?: () => void;
   onReady?: () => void;
 }) {
   const ref = useRef<HTMLMediaElement>(null),
-    current = useRef(playback);
-  current.current = playback;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a playback instance or URL change must rebind the media element.
+    current = useRef({ playback, clockOffset, audio, onError, onAudioBlocked, onReady }),
+    synchronize = useRef<(() => void) | null>(null);
+  current.current = { playback, clockOffset, audio, onError, onAudioBlocked, onReady };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new playback or media URL must rebind the element, without pausing on clock updates.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    let disposed = false;
+    let disposed = false,
+      starting = false,
+      blocked = false;
     const sync = () => {
-      const p = current.current,
+      const { playback: p, clockOffset, audio, onError, onAudioBlocked } = current.current,
         position = playbackPosition(p, Date.now() + clockOffset);
       el.volume = p.volume;
       el.muted = !audio;
@@ -158,37 +172,73 @@ export function SyncedMedia({
       if (el.readyState < 1) return;
       if (Math.abs(el.currentTime - position) > 0.35) el.currentTime = position;
       if (p.playing && (p.loop || position < p.duration)) {
-        if (el.paused)
-          void el.play().catch(() => {
-            if (!disposed && audio)
-              onError?.(
-                "Audio playback is blocked. Click the headphone monitor or Enable audio to allow playback.",
-              );
-          });
+        if (el.paused && !starting) {
+          starting = true;
+          void el
+            .play()
+            .then(() => {
+              blocked = false;
+            })
+            .catch((error: unknown) => {
+              if (disposed || (error instanceof DOMException && error.name === "AbortError"))
+                return;
+              if (error instanceof DOMException && error.name === "NotAllowedError") {
+                if (audio && !blocked) {
+                  blocked = true;
+                  if (onAudioBlocked) onAudioBlocked();
+                  else
+                    onError?.("Audio playback is blocked. Click Enable audio to allow playback.");
+                }
+              } else
+                onError?.(
+                  `Cannot play ${asset?.name ?? "this file"}. Check its format and connection.`,
+                );
+            })
+            .finally(() => {
+              starting = false;
+            });
+        }
       } else el.pause();
     };
+    synchronize.current = sync;
     const ready = () => {
       sync();
-      onReady?.();
+      current.current.onReady?.();
     };
     const failed = () =>
-      onError?.(
+      current.current.onError?.(
         `Cannot play ${asset?.name ?? "this file"}. Check the file format and Refresh the library.`,
       );
+    el.addEventListener("loadedmetadata", sync);
     el.addEventListener("loadeddata", ready);
     el.addEventListener("error", failed);
+    window.addEventListener("pointerdown", sync);
+    window.addEventListener("keydown", sync);
     sync();
     const timer = setInterval(sync, 500);
     return () => {
       disposed = true;
+      synchronize.current = null;
       clearInterval(timer);
       el.pause();
+      el.removeEventListener("loadedmetadata", sync);
       el.removeEventListener("loadeddata", ready);
       el.removeEventListener("error", failed);
+      window.removeEventListener("pointerdown", sync);
+      window.removeEventListener("keydown", sync);
     };
-  }, [playback.id, asset?.url, asset?.name, audio, clockOffset, onError, onReady]);
+  }, [playback.id, asset?.url, asset?.name]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: changes to playback, audio, and the clock need immediate synchronization.
+  useEffect(() => {
+    synchronize.current?.();
+  }, [playback, audio, clockOffset]);
   if (!asset) return <div className="program-missing">Media unavailable</div>;
-  const props = { src: asset.url, preload: "auto", onLoadedMetadata: () => onReady?.() } as const;
+  const props = {
+    src: asset.url,
+    preload: "auto",
+    muted: !audio,
+    "data-media-playback": playback.playing ? "playing" : "paused",
+  } as const;
   return asset.kind === "video" ? (
     <video
       ref={(el) => {
@@ -215,6 +265,7 @@ export function ProgramCanvas({
   programAudio = false,
   effectsAudio = false,
   onMediaError,
+  onAudioBlocked,
 }: {
   state: StudioState;
   sources: Source[];
@@ -223,6 +274,7 @@ export function ProgramCanvas({
   programAudio?: boolean;
   effectsAudio?: boolean;
   onMediaError?: (message: string) => void;
+  onAudioBlocked?: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null),
     [scale, setScale] = useState(1),
@@ -346,6 +398,7 @@ export function ProgramCanvas({
             clockOffset={clockOffset}
             audio={effectsAudio}
             onError={onMediaError}
+            onAudioBlocked={onAudioBlocked}
           />
         ) : (
           <>
@@ -400,6 +453,7 @@ export function ProgramCanvas({
                 clockOffset={clockOffset}
                 audio={effectsAudio}
                 onError={onMediaError}
+                onAudioBlocked={onAudioBlocked}
               />
             ) : null,
           )}

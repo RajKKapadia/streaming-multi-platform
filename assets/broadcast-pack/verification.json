@@ -1,0 +1,29 @@
+{
+  "countdown": {
+    "duration_seconds": 60.0,
+    "codec": "h264",
+    "resolution": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "frames": 1800,
+    "all_61_timer_samples_matched": true,
+    "full_decode_passed": true,
+    "browser_playback": {
+      "duration_seconds": 60,
+      "ended": true,
+      "error": null
+    }
+  },
+  "overlays": {
+    "count": 4,
+    "timing_verified": true,
+    "alpha_verified": true,
+    "transparent_final_frames_verified": true
+  },
+  "studio_media_discovery": {
+    "clips": 1,
+    "overlays": 4
+  }
+}

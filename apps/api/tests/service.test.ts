@@ -19,6 +19,7 @@ import {
   type Destination,
   type Role,
   type Encoding,
+  messageHistoryLimit,
 } from "@studio/contracts";
 import { StudioService, validateURL } from "../src/service";
 import { Auth, matchesPasscode } from "../src/auth";
@@ -82,6 +83,7 @@ export class FakeGateway implements Gateway {
               height: 1080,
               framerate: encoding.fps,
               videoBitrate: encoding.bitrate,
+              keyFrameInterval: encoding.keyframeInterval ?? 2,
             }),
           },
           outputs: [new Output({ config: { case: "stream", value: new StreamOutput({ urls }) } })],
@@ -177,7 +179,138 @@ describe("access and media", () => {
     expect(f.gateway.state.participants).toEqual(["host"]);
   });
 });
+describe("studio messages", () => {
+  test("host and backstage guests share ordered history without changing program metadata", async () => {
+    const f = fixture();
+    f.gateway.people = ["host", "guest-1"].map((identity) => ({
+      identity,
+      name: identity === "host" ? "Host" : "Alex",
+      role: identity === "host" ? "host" : "guest",
+      camera: false,
+      microphone: false,
+      screenSid: null,
+    }));
+    const host = { identity: "host", name: "Host", role: "host" as const };
+    const guest = { identity: "guest-1", name: "Alex", role: "guest" as const };
+    const before = structuredClone(f.gateway.state);
+    await f.service.sendMessage("personal", host, "  Ready?  ");
+    await f.service.sendMessage("personal", guest, "Ready!\nMy camera is off.");
+    const history = f.service.messages("personal");
+    expect(history.messages.map((m) => m.text)).toEqual(["Ready?", "Ready!\nMy camera is off."]);
+    expect(history.messages.map((m) => m.role)).toEqual(["host", "guest"]);
+    expect(history.revision).toBe(2);
+    expect(new Set(history.messages.map((m) => m.id)).size).toBe(2);
+    expect(f.service.messages("other").messages).toEqual([]);
+    expect(f.gateway.state).toEqual(before);
+    await expect(f.service.sendMessage("personal", guest, "   ")).rejects.toThrow();
+    await expect(f.service.sendMessage("personal", guest, "x".repeat(2001))).rejects.toThrow();
+    f.gateway.people = [];
+    await expect(f.service.sendMessage("personal", guest, "Disconnected")).rejects.toThrow(
+      "reconnect",
+    );
+    expect(f.service.messages("personal").revision).toBe(2);
+  });
+  test("concurrent sends retain the most recent 100 messages and preserve prior snapshots", async () => {
+    const f = fixture();
+    f.gateway.people = [
+      {
+        identity: "host",
+        name: "Host",
+        role: "host",
+        camera: false,
+        microphone: false,
+        screenSid: null,
+      },
+    ];
+    const empty = f.service.messages("personal");
+    await Promise.all(
+      Array.from({ length: messageHistoryLimit + 5 }, (_, i) =>
+        f.service.sendMessage(
+          "personal",
+          { identity: "host", name: "Host", role: "host" },
+          `Message ${i}`,
+        ),
+      ),
+    );
+    const history = f.service.messages("personal");
+    expect(history.messages).toHaveLength(messageHistoryLimit);
+    expect(history.messages[0]!.text).toBe("Message 5");
+    expect(history.messages.at(-1)!.text).toBe(`Message ${messageHistoryLimit + 4}`);
+    expect(history.revision).toBe(messageHistoryLimit + 5);
+    expect(empty.messages).toEqual([]);
+    expect(history.sessionId).toBe(empty.sessionId);
+    expect(fixture(f.gateway).service.messages("personal").sessionId).not.toBe(history.sessionId);
+  });
+});
 describe("broadcast management", () => {
+  test("Twitch and YouTube accept just a key and use their built-in servers", async () => {
+    const f = fixture();
+    await f.service.updateDestinations(
+      "personal",
+      ds().map((d) => ({
+        ...d,
+        enabled: d.platform !== "x",
+        url: "  ",
+        key: `  ${d.key}  `,
+      })),
+    );
+    await f.service.start("personal");
+    expect(f.gateway.starts).toBe(1);
+    expect(f.gateway.jobs[0]!.streamResults.map((o) => o.url)).toEqual([
+      "rtmps://a.rtmps.youtube.com:443/live2/private-youtube-key",
+      "rtmp://live.twitch.tv/app/private-twitch-key",
+    ]);
+    expect(JSON.stringify(f.service.publicDestinations("personal"))).not.toContain("private-");
+    await f.service.stop("personal");
+    await expect(
+      f.service.updateDestinations(
+        "personal",
+        ds().map((d) => ({
+          ...d,
+          url: "",
+          enabled: d.platform === "x",
+        })),
+      ),
+    ).rejects.toThrow("server URL from X");
+  });
+  test("custom ingest addresses and keys survive an unrelated destination save", async () => {
+    const f = fixture();
+    const destinations = ds().map((d) => ({ ...d, enabled: false }));
+    await f.service.updateDestinations("personal", destinations);
+    await f.service.updateDestinations("personal", f.service.publicDestinations("personal"));
+    expect(f.service.destinations("personal").map((d) => ({ url: d.url, key: d.key }))).toEqual(
+      destinations.map((d) => ({ url: d.url, key: d.key })),
+    );
+  });
+  test("aborted renderer startup is reported as failed with actionable, safe details", async () => {
+    const f = fixture();
+    await f.service.updateDestinations("personal", ds());
+    await f.service.start("personal");
+    for (const job of f.gateway.jobs) {
+      job.status = EgressStatus.EGRESS_ABORTED;
+      job.error = "Start signal not received";
+      job.streamResults = [];
+    }
+    const status = await f.service.status("personal");
+    expect(status.live).toBe(false);
+    expect(status.groups.flatMap((g) => g.destinations)).toHaveLength(3);
+    for (const output of status.groups.flatMap((g) => g.destinations)) {
+      expect(output.status).toBe("failed");
+      expect(output.error).toContain("program renderer did not become ready");
+    }
+    expect(JSON.stringify(status)).not.toContain("private-");
+  });
+  test("queued Egress outputs are shown as starting until capture is active", async () => {
+    const f = fixture();
+    await f.service.updateDestinations("personal", ds());
+    await f.service.start("personal");
+    for (const job of f.gateway.jobs) job.status = EgressStatus.EGRESS_STARTING;
+    const status = await f.service.status("personal");
+    expect(status.live).toBe(true);
+    expect(status.groups.flatMap((g) => g.destinations).every((d) => d.status === "starting")).toBe(
+      true,
+    );
+  });
   test("groups profiles, serializes duplicate starts and masks all keys", async () => {
     const f = fixture();
     await f.service.updateDestinations("personal", ds());
@@ -231,6 +364,40 @@ describe("broadcast management", () => {
     expect(() => validateURL("rtmp://localhost/app")).toThrow();
   });
 });
+test.each([
+  [false, "http://localhost:5173", 200],
+  [false, "http://127.0.0.1:5173", 200],
+  [false, "https://untrusted.example.com", 403],
+  [false, "http://localhost:5173.untrusted.example.com", 403],
+  [true, "http://localhost:5173", 403],
+  [true, "http://127.0.0.1:5173", 403],
+  [true, "https://studio.example.com", 200],
+  [true, "https://untrusted.example.com", 403],
+] as const)(
+  "HTTP session origin enforcement (production=%s, origin=%s, status=%s)",
+  async (production, origin, status) => {
+    const { app } = createApp({ ...config, production }, new FakeGateway());
+    const server = app.listen(0, "127.0.0.1");
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.on("listening", resolve);
+        server.on("error", reject);
+      });
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("No test port");
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/session`, {
+        method: "POST",
+        headers: { Origin: origin, "Content-Type": "application/json" },
+        body: JSON.stringify({ studio: "personal", name: "Host", passcode: config.passcode }),
+      });
+      expect(response.status).toBe(status);
+      if (status === 200) expect(response.headers.get("set-cookie")).toContain("HttpOnly");
+      else expect(await response.json()).toEqual({ error: "This request origin is not allowed." });
+    } finally {
+      server.close();
+    }
+  },
+);
 test("HTTP routes enforce host authorization and scoped media access", async () => {
   const root = await mkdtemp(join(tmpdir(), "studio-http-media-"));
   await mkdir(join(root, "logos"));
@@ -291,6 +458,75 @@ test("HTTP routes enforce host authorization and scoped media access", async () 
     expect(login.status).toBe(200);
     expect(login.headers.get("set-cookie")).toContain("HttpOnly");
     const hostCookie = login.headers.get("set-cookie")!.split(";")[0]!.split("=")[1]!;
+    const messagesPath = "/api/studios/personal/messages";
+    expect((await request(messagesPath)).status).toBe(401);
+    expect((await request("/api/studios/other/messages", "GET", undefined, token)).status).toBe(
+      401,
+    );
+    expect((await request(messagesPath, "POST", { text: "Not connected" }, token)).status).toBe(
+      400,
+    );
+    gateway.people = ["host", "guest-1"].map((identity) => ({
+      identity,
+      name: identity === "host" ? "Host" : "Alex",
+      role: identity === "host" ? "host" : "guest",
+      camera: false,
+      microphone: false,
+      screenSid: null,
+    }));
+    const hostMessage = await request(
+      messagesPath,
+      "POST",
+      { text: "  Welcome backstage  " },
+      hostCookie,
+    );
+    expect(hostMessage.status).toBe(200);
+    const guestHistory = await (await request(messagesPath, "GET", undefined, token)).json();
+    expect(guestHistory.messages[0].text).toBe("Welcome backstage");
+    expect(guestHistory.messages[0].role).toBe("host");
+    expect(
+      (
+        await request(
+          messagesPath,
+          "POST",
+          { text: "Hello host!", identity: "host", role: "host", name: "Impersonated" },
+          token,
+        )
+      ).status,
+    ).toBe(200);
+    const hostHistory = await (await request(messagesPath, "GET", undefined, hostCookie)).json();
+    expect(hostHistory.messages[1]).toMatchObject({
+      identity: "guest-1",
+      role: "guest",
+      name: "Alex",
+      text: "Hello host!",
+    });
+    expect((await request(messagesPath, "POST", { text: "   " }, token)).status).toBe(400);
+    expect((await request(messagesPath, "POST", { text: "x".repeat(2001) }, token)).status).toBe(
+      400,
+    );
+    const renderToken = auth.sign({
+      studio: "personal",
+      identity: "renderer-test",
+      name: "Renderer",
+      role: "renderer",
+      purpose: "render",
+      expires: Date.now() + 10000,
+    });
+    expect(
+      (await request(`${messagesPath}?access=${encodeURIComponent(renderToken)}`)).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(`${messagesPath}?access=${encodeURIComponent(renderToken)}`, "POST", {
+          text: "Renderer",
+        })
+      ).status,
+    ).toBe(403);
+    const renderState = await (
+      await request(`/api/studios/personal/state?access=${encodeURIComponent(renderToken)}`)
+    ).json();
+    expect(JSON.stringify(renderState)).not.toContain("Welcome backstage");
     const manifest1 = await (
       await request("/api/studios/personal/assets", "GET", undefined, hostCookie)
     ).json();
@@ -369,8 +605,11 @@ test("HTTP routes enforce host authorization and scoped media access", async () 
       purpose: "invite",
     });
     expect(
-      (await request(`/api/studios/personal/backgrounds?access=${encodeURIComponent(expiredInvite)}`))
-        .status,
+      (
+        await request(
+          `/api/studios/personal/backgrounds?access=${encodeURIComponent(expiredInvite)}`,
+        )
+      ).status,
     ).toBe(401);
     expect(
       (await request(`/api/studios/personal/assets?access=${encodeURIComponent(invite)}`)).status,

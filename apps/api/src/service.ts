@@ -4,8 +4,11 @@ import {
   initialState,
   settleState,
   stateSchema,
-  defaultEncoding,
+  defaultDestinationURLs,
+  defaultPlatformEncoding,
   platformIds,
+  messageHistoryLimit,
+  messageInputSchema,
   type StudioState,
   type Command,
   type Destination,
@@ -14,9 +17,10 @@ import {
   type Encoding,
   type Platform,
   type VisualPreset,
+  type MessagesSnapshot,
 } from "@studio/contracts";
 import { EgressStatus, type EgressInfo } from "livekit-server-sdk";
-import { activeEgress, type Gateway } from "./livekit";
+import { activeEgress, RendererUnavailableError, type Gateway } from "./livekit";
 import type { Config } from "./config";
 import type { Auth } from "./auth";
 import type { MediaLibrary } from "./media";
@@ -27,7 +31,11 @@ export class StudioService {
   private queues = new Map<string, Promise<unknown>>();
   private overrides = new Map<string, Destination[]>();
   private managed = new Map<string, EgressInfo[]>();
-  private pending = new Map<string, { id: string; encoding: Encoding; platforms: Platform[] }[]>();
+  private pending = new Map<
+    string,
+    { id: string; encoding: Encoding; platforms: Platform[]; error?: string }[]
+  >();
+  private conversations = new Map<string, MessagesSnapshot>();
   constructor(
     private config: Config,
     private gateway: Gateway,
@@ -210,15 +218,59 @@ export class StudioService {
       return { state: next, serverTime: Date.now() };
     });
   }
+  messages(studio: string): MessagesSnapshot {
+    let conversation = this.conversations.get(studio);
+    if (!conversation) {
+      conversation = { sessionId: crypto.randomUUID(), revision: 0, messages: [] };
+      this.conversations.set(studio, conversation);
+    }
+    return conversation;
+  }
+  async sendMessage(
+    studio: string,
+    sender: { identity: string; name: string; role: "host" | "guest" },
+    text: string,
+  ) {
+    const input = messageInputSchema.parse({ text });
+    return this.serial(studio, async () => {
+      const people = await this.gateway.participants(this.room(studio));
+      const participant = people.find(
+        (p) => p.identity === sender.identity && p.role === sender.role,
+      );
+      if (!participant) throw new Error("This participant must reconnect before sending messages.");
+      const previous = this.messages(studio);
+      const next: MessagesSnapshot = {
+        sessionId: previous.sessionId,
+        revision: previous.revision + 1,
+        messages: [
+          ...previous.messages,
+          {
+            id: crypto.randomUUID(),
+            identity: sender.identity,
+            name: participant.name || sender.name,
+            role: sender.role,
+            text: input.text,
+            sentAt: Date.now(),
+          },
+        ].slice(-messageHistoryLimit),
+      };
+      this.conversations.set(studio, next);
+      return next;
+    });
+  }
   destinations(studio: string): Destination[] {
     return (
       this.overrides.get(studio) ??
       platformIds.map((platform) => ({
         platform,
         enabled: false,
-        url: process.env[`${platform.toUpperCase()}_RTMP_URL`] ?? "",
-        key: process.env[`${platform.toUpperCase()}_STREAM_KEY`] ?? "",
-        encoding: { ...defaultEncoding },
+        url:
+          platform === "twitch"
+            ? defaultDestinationURLs.twitch
+            : process.env[`${platform.toUpperCase()}_RTMP_URL`]?.trim() ||
+              defaultDestinationURLs[platform],
+        key: process.env[`${platform.toUpperCase()}_STREAM_KEY`]?.trim() ?? "",
+        encoding: defaultPlatformEncoding(platform),
       }))
     );
   }
@@ -234,14 +286,20 @@ export class StudioService {
       const previous = this.destinations(studio);
       const next = input.map((d) => ({
         ...d,
-        key: d.key === undefined ? previous.find((p) => p.platform === d.platform)?.key : d.key,
+        url: d.url.trim() || defaultDestinationURLs[d.platform],
+        key:
+          d.key === undefined ? previous.find((p) => p.platform === d.platform)?.key : d.key.trim(),
+        encoding: {
+          ...d.encoding,
+          keyframeInterval: d.platform === "x" ? (3 as const) : (2 as const),
+        },
       }));
       for (const d of next) {
         if (d.url) validateURL(d.url);
         if (d.platform !== "x" && d.encoding.fps !== 60)
           throw new Error("Use a 60 fps profile for YouTube and Twitch.");
-        if (d.enabled && (!d.url || !d.key))
-          throw new Error(`Enter a stream URL and key for ${d.platform}.`);
+        if (d.enabled && !d.url) throw new Error(`Enter the server URL from X Live Studio.`);
+        if (d.enabled && !d.key) throw new Error(`Enter a stream key for ${d.platform}.`);
       }
       this.overrides.set(studio, next);
       return this.publicDestinations(studio);
@@ -263,7 +321,8 @@ export class StudioService {
         const key = JSON.stringify(d.encoding);
         groups.set(key, [...(groups.get(key) ?? []), d]);
       }
-      const failures: { id: string; encoding: Encoding; platforms: Platform[] }[] = [];
+      const failures: { id: string; encoding: Encoding; platforms: Platform[]; error?: string }[] =
+        [];
       for (const ds of groups.values()) {
         const capability = this.auth.sign({
           role: "renderer",
@@ -297,11 +356,12 @@ export class StudioService {
               },
             ].slice(-16),
           });
-        } catch {
+        } catch (error) {
           failures.push({
             id: `failed-${createHash("sha256").update(JSON.stringify(ds[0]!.encoding)).digest("hex").slice(0, 8)}`,
             encoding: ds[0]!.encoding,
             platforms: ds.map((d) => d.platform),
+            ...(error instanceof RendererUnavailableError ? { error: error.message } : {}),
           });
         }
       }
@@ -337,16 +397,18 @@ export class StudioService {
         ? snapshot.data.broadcasts.find((b) => b.id === job.egressId)
         : undefined;
       const encoding = readEncoding(job);
+      const failed = [EgressStatus.EGRESS_FAILED, EgressStatus.EGRESS_ABORTED].includes(job.status);
       const outputs = job.streamResults.length
         ? job.streamResults
         : requestURLs(job).map((url) => ({
             url,
-            status:
-              job.status === EgressStatus.EGRESS_FAILED
-                ? 2
-                : job.status === EgressStatus.EGRESS_COMPLETE
-                  ? 1
-                  : 0,
+            status: failed
+              ? 2
+              : [EgressStatus.EGRESS_COMPLETE, EgressStatus.EGRESS_LIMIT_REACHED].includes(
+                    job.status,
+                  )
+                ? 1
+                : 0,
             error: job.error,
           }));
       return {
@@ -357,11 +419,17 @@ export class StudioService {
           platform:
             record?.outputs.find((d) => d.fingerprint === fingerprint(o.url))?.platform ??
             identifyPlatform(o.url, this.destinations(studio)),
-          status: ["active", "finished", "failed"][o.status] ?? "unknown",
-          ...(o.error
+          status: failed
+            ? "failed"
+            : job.status === EgressStatus.EGRESS_STARTING && o.status === 0
+              ? "starting"
+              : (["active", "finished", "failed"][o.status] ?? "unknown"),
+          ...(o.error || failed
             ? {
                 error:
-                  "The platform rejected or disconnected this output. Check its dashboard and stream key.",
+                  job.error === "Start signal not received"
+                    ? "The program renderer did not become ready. Check that PUBLIC_APP_URL serves the latest build and its broadcast page and media are reachable."
+                    : "The output failed. Check the program renderer, platform dashboard, and stream key.",
               }
             : {}),
         })),
@@ -375,7 +443,9 @@ export class StudioService {
         destinations: failed.platforms.map((platform) => ({
           platform,
           status: "failed",
-          error: "This output could not start. Check LiveKit Egress access and platform settings.",
+          error:
+            failed.error ??
+            "This output could not start. Check LiveKit Egress access and platform settings.",
         })),
       });
     return { groups, live: jobs.some(activeEgress), serverTime: Date.now() };
@@ -426,6 +496,7 @@ function readEncoding(job: EgressInfo): Encoding {
     height: 1080,
     fps: options?.framerate === 30 ? 30 : 60,
     bitrate: options?.videoBitrate ?? 6000,
+    keyframeInterval: options?.keyFrameInterval === 3 ? 3 : 2,
   };
 }
 
