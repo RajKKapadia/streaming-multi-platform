@@ -8,3 +8,7 @@ media/**/*
 !media/**/
 !media/**/.gitkeep
 test-results/
+
+# Custom files
+docs/broadcast-studio-x-article.zip
+docs/x-article
