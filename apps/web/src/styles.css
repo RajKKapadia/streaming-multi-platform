@@ -3,14 +3,16 @@
 @source "../../../packages/studio/src";
 :root {
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #252c3a;
+  color: var(--text);
   background: #fff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   --blue: #1456ef;
   --border: #e4e7ee;
-  --muted: #7a8395;
+  --text: #171e2b;
+  --text-secondary: #364358;
+  --muted: #4d596c;
   --surface: #f5f7fa;
 }
 * {
@@ -63,7 +65,7 @@ label {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: #697386;
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
 }
@@ -131,7 +133,7 @@ svg {
   border: 1px solid #ccd2dd;
   border-radius: 6px;
   padding: 9px 11px;
-  color: #303949;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 400;
 }
@@ -141,7 +143,7 @@ svg {
   border-color: var(--blue);
 }
 .ui-input::placeholder {
-  color: #a0a7b5;
+  color: var(--muted);
 }
 .ui-switch {
   width: 30px;
@@ -243,7 +245,7 @@ svg {
   min-width: 30px;
   min-height: 30px;
   border-radius: 6px;
-  color: #7a8395;
+  color: var(--muted);
 }
 .icon-button:hover {
   background: #edf1f8;
@@ -280,7 +282,7 @@ svg {
   align-items: center;
   gap: 10px;
   font-size: 12px;
-  color: #667085;
+  color: var(--text-secondary);
   margin: 15px 0;
 }
 .compact {
@@ -322,7 +324,7 @@ svg {
   padding: 28px 42px;
 }
 .header-note {
-  color: #9ca4b2;
+  color: var(--muted);
   font-size: 12px;
 }
 .prejoin-main {
@@ -336,7 +338,7 @@ svg {
   gap: 10px;
   padding: 14px 18px;
   border-radius: 7px;
-  color: #4a79d7;
+  color: #2354a7;
   background: #edf4ff;
   font-size: 12px;
 }
@@ -363,7 +365,7 @@ svg {
   justify-content: center;
   background: radial-gradient(ellipse at 20% 0, #f0f5ff, #e4eaf5);
   gap: 8px;
-  color: #526783;
+  color: var(--text-secondary);
 }
 .camera-symbol {
   display: grid;
@@ -374,7 +376,7 @@ svg {
   background: #ffffff9e;
   border-radius: 20px;
   margin-bottom: 3px;
-  color: #6b8bb4;
+  color: var(--muted);
 }
 .camera-placeholder h3 {
   font-size: 16px;
@@ -382,7 +384,7 @@ svg {
 }
 .camera-placeholder p {
   font-size: 12px;
-  color: #8997ad;
+  color: var(--muted);
 }
 .camera-placeholder .ui-button {
   margin-top: 7px;
@@ -433,7 +435,7 @@ svg {
 }
 .preview-caption {
   text-align: center;
-  color: #a0a9b7;
+  color: var(--muted);
   font-size: 11px;
   margin-top: 14px;
 }
@@ -450,7 +452,7 @@ svg {
   font-size: 10px;
   font-weight: 650;
   letter-spacing: 1.5px;
-  color: #8a97ad;
+  color: var(--muted);
 }
 .join-form h1 {
   font-size: 28px;
@@ -462,7 +464,7 @@ svg {
 .subtle {
   font-size: 12px;
   line-height: 1.8;
-  color: #8a92a1;
+  color: var(--muted);
 }
 .join-form label {
   margin: 20px 0;
@@ -477,7 +479,7 @@ svg {
   padding: 15px 12px;
   border-radius: 7px;
   margin: 24px 0;
-  color: #8b94a4;
+  color: var(--muted);
 }
 .mic-test:focus-visible {
   outline: 2px solid var(--blue);
@@ -519,10 +521,10 @@ svg {
   border-radius: 6px;
   padding: 12px;
   margin-top: 18px;
-  color: #8691a2;
+  color: var(--muted);
 }
 .setup-notice strong {
-  color: #626e83;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 .setup-notice p {
@@ -535,7 +537,7 @@ svg {
 .prejoin-footer {
   display: flex;
   justify-content: space-between;
-  color: #a8b0bc;
+  color: var(--muted);
   font-size: 10px;
   border-top: 1px solid #f0f2f6;
   margin-top: 95px;
@@ -566,7 +568,7 @@ svg {
   width: 100%;
   padding: 13px 17px;
   font-size: 12px;
-  color: #788397;
+  color: var(--muted);
   text-align: left;
 }
 .settings-nav button.active {
@@ -584,7 +586,7 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #a2b1c9;
+  color: var(--muted);
   margin-bottom: 22px;
 }
 .settings-content > label {
@@ -630,7 +632,7 @@ svg {
 .studio-title > span {
   font-size: 8px;
   letter-spacing: 1px;
-  color: #9ba4b4;
+  color: var(--muted);
   border-left: 1px solid #e5e8ef;
   padding-left: 14px;
 }
@@ -647,7 +649,7 @@ svg {
   gap: 7px;
   font-size: 10px;
   margin-right: 10px;
-  color: #8b95a6;
+  color: var(--muted);
 }
 .ready-pill > span {
   width: 6px;
@@ -656,7 +658,7 @@ svg {
   background: #6bb89a;
 }
 .live-pill {
-  color: #da3c35;
+  color: #b72924;
   font-weight: 650;
   letter-spacing: 1px;
 }
@@ -676,15 +678,20 @@ svg {
   flex-shrink: 0;
   padding: 8px 25px;
   background: #eef3ff;
-  color: #6d87bd;
+  color: #34558b;
   font-size: 11px;
+}
+.preview-banner .text-link {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-weight: 600;
 }
 .preview-banner button {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #3970d6;
+  color: #2254af;
   font-size: 10px;
 }
 .error-banner {
@@ -698,7 +705,7 @@ svg {
 }
 .connection-banner {
   background: #fff7de;
-  color: #99792f;
+  color: #765214;
 }
 .studio-workspace {
   display: flex;
@@ -719,7 +726,7 @@ svg {
   justify-content: space-between;
   font-size: 10px;
   font-weight: 500;
-  color: #8a93a5;
+  color: var(--muted);
   margin-bottom: 8px;
   flex-shrink: 0;
   text-transform: uppercase;
@@ -825,7 +832,7 @@ svg {
 }
 .layout-label {
   font-size: 10px;
-  color: #919bad;
+  color: var(--muted);
   min-width: 75px;
 }
 .person-card,
@@ -892,12 +899,12 @@ svg {
 .backstage-heading h2 span {
   font-size: 10px;
   margin-left: 8px;
-  color: #a0a9b8;
+  color: var(--muted);
   font-weight: 400;
 }
 .backstage-heading p {
   font-size: 10px;
-  color: #9aa3b3;
+  color: var(--muted);
 }
 .backstage-cards {
   display: flex;
@@ -928,7 +935,7 @@ svg {
   left: 5px;
   top: 5px;
   background: #fff9;
-  color: #536580;
+  color: var(--text-secondary);
   font-size: 6px;
   letter-spacing: 0.5px;
   padding: 3px 5px;
@@ -967,14 +974,14 @@ svg {
   justify-content: space-between;
 }
 .person-details small {
-  color: #9da6b7;
+  color: var(--muted);
   font-size: 8px;
   margin-left: 5px;
 }
 .person-details > div {
   display: flex;
   gap: 4px;
-  color: #5e84c8;
+  color: #345b9b;
 }
 .person-details button {
   padding: 2px;
@@ -989,12 +996,12 @@ svg {
   justify-content: center;
   align-items: center;
   gap: 8px;
-  color: #a2acc0;
+  color: var(--muted);
 }
 .invite-card strong {
   font-size: 10px;
   font-weight: 500;
-  color: #71819c;
+  color: var(--text-secondary);
 }
 .invite-card span {
   font-size: 8px;
@@ -1013,7 +1020,7 @@ svg {
 .connection-label,
 .source-capture {
   font-size: 9px;
-  color: #9ca5b4;
+  color: var(--muted);
   min-width: 130px;
 }
 .source-capture {
@@ -1028,7 +1035,7 @@ svg {
   min-width: 36px;
   min-height: 36px;
   padding: 8px;
-  color: #526176;
+  color: var(--text-secondary);
 }
 .bottom-controls .ui-button-secondary {
   background: #f2f4f8;
@@ -1070,7 +1077,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 9px;
-  color: #3b4f70;
+  color: var(--text-secondary);
 }
 .panel-header strong {
   font-size: 12px;
@@ -1080,11 +1087,11 @@ svg {
   min-height: 30px;
   min-width: 30px;
   padding: 7px;
-  color: #91a0b7;
+  color: var(--muted);
 }
 .panel-note {
   padding: 12px 18px;
-  color: #8490a4;
+  color: var(--muted);
   font-size: 10px;
   line-height: 1.5;
   border-bottom: 1px solid #eff1f5;
@@ -1101,7 +1108,7 @@ svg {
   margin-bottom: 12px;
 }
 .media-section h3 svg {
-  color: #97a1b2;
+  color: var(--muted);
 }
 .asset-grid {
   display: grid;
@@ -1125,7 +1132,7 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #7284a5;
+  color: var(--muted);
 }
 .asset-thumb img {
   width: 100%;
@@ -1137,7 +1144,7 @@ svg {
   display: block;
   line-height: 1.6;
   margin-top: 4px;
-  color: #8893a7;
+  color: var(--muted);
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
@@ -1147,7 +1154,7 @@ svg {
   outline-offset: 2px;
 }
 .asset-card.selected > span {
-  color: #4978d5;
+  color: #2254af;
 }
 .checker {
   background: repeating-conic-gradient(#f0f2f5 0% 25%, white 0% 50%) 50% / 12px 12px;
@@ -1163,7 +1170,7 @@ svg {
   align-items: center;
   gap: 9px;
   font-size: 9px;
-  color: #b0b8c5;
+  color: var(--muted);
   background: #fafbfd;
   border: 1px dashed #e4e8f0;
   padding: 12px 10px;
@@ -1173,7 +1180,7 @@ svg {
   display: block;
   font-family: monospace;
   font-size: 9px;
-  color: #8290a6;
+  color: var(--muted);
   margin-top: 4px;
 }
 .media-options {
@@ -1181,7 +1188,7 @@ svg {
   align-items: center;
   gap: 12px;
   font-size: 9px;
-  color: #99a3b4;
+  color: var(--muted);
   margin-top: 14px;
 }
 .segmented {
@@ -1195,7 +1202,7 @@ svg {
   display: flex;
   align-items: center;
   padding: 3px 5px;
-  color: #a4aec0;
+  color: var(--muted);
   border-radius: 3px;
 }
 .segmented button.active {
@@ -1205,7 +1212,7 @@ svg {
 .media-section .setting-line {
   font-size: 9px;
   gap: 7px;
-  color: #939dae;
+  color: var(--muted);
 }
 .media-section .ui-switch {
   width: 26px;
@@ -1231,7 +1238,10 @@ svg {
   bottom: 3px;
   left: 4px;
   font-size: 8px;
-  color: #a0adc6;
+  color: var(--muted);
+}
+.clip-thumb .asset-duration {
+  color: #d5deed;
 }
 .selected-check {
   position: absolute;
@@ -1258,7 +1268,7 @@ svg {
   align-items: center;
   font-size: 9px;
   gap: 8px;
-  color: #95a0b2;
+  color: var(--muted);
 }
 .color-label input {
   width: 22px;
@@ -1277,7 +1287,7 @@ svg {
 }
 .now-playing {
   font-size: 9px;
-  color: #5c79a7;
+  color: var(--text-secondary);
   display: block;
 }
 .playback-buttons {
@@ -1285,7 +1295,7 @@ svg {
   align-items: center;
   gap: 6px;
   margin-top: 5px;
-  color: #8b9bb4;
+  color: var(--muted);
 }
 .playback-buttons .ui-button {
   padding: 3px;
@@ -1298,7 +1308,7 @@ svg {
   display: flex;
   gap: 6px;
   align-items: center;
-  color: #a0abba;
+  color: var(--muted);
   line-height: 1.6;
 }
 .panel-rail {
@@ -1320,7 +1330,7 @@ svg {
   padding: 10px 0;
   gap: 5px;
   border-radius: 6px;
-  color: #909bad;
+  color: var(--muted);
 }
 .panel-rail button span {
   font-size: 8px;
@@ -1402,15 +1412,15 @@ svg {
 }
 .joined-person-info > span {
   font-size: 10px;
-  color: #919bad;
+  color: var(--muted);
 }
 .joined-person-info > .joined-stage {
-  color: #3972d8;
+  color: #2254af;
 }
 .joined-devices {
   display: flex;
   gap: 7px;
-  color: #8c98aa;
+  color: var(--muted);
 }
 .joined-person .ui-button {
   padding: 6px 8px;
@@ -1467,12 +1477,12 @@ svg {
   min-height: 180px;
   padding: 20px 10px;
   text-align: center;
-  color: #91a6cc;
+  color: var(--muted);
 }
 .messages-empty h3 {
   font-size: 13px;
   font-weight: 550;
-  color: #566780;
+  color: var(--text-secondary);
 }
 .messages-empty p {
   font-size: 11px;
@@ -1495,7 +1505,7 @@ svg {
   overflow-wrap: anywhere;
   font-size: 11px;
   font-weight: 550;
-  color: #5f6e86;
+  color: var(--text-secondary);
 }
 .message-meta time {
   flex-shrink: 0;
@@ -1503,7 +1513,7 @@ svg {
 }
 .message-role {
   font-size: 8px;
-  color: #3972d8;
+  color: #2254af;
 }
 .studio-message > p {
   padding: 10px 12px;
@@ -1550,7 +1560,7 @@ svg {
 }
 .failed-output {
   font-size: 11px;
-  color: #bb584a;
+  color: #a3362c;
   padding: 8px 0;
   text-align: left;
 }
@@ -1584,7 +1594,7 @@ svg {
 }
 .destination-tabs button > span:nth-child(2) {
   font-size: 11px;
-  color: #7d889c;
+  color: var(--muted);
 }
 .platform-mark {
   display: grid;
@@ -1640,7 +1650,7 @@ svg {
 .destination-server summary {
   cursor: pointer;
   font-size: 12px;
-  color: #687993;
+  color: var(--text-secondary);
   margin-bottom: 12px;
 }
 .destination-server .hint {
@@ -1657,14 +1667,14 @@ svg {
   position: absolute;
   right: 10px;
   top: 12px;
-  color: #9aa5b7;
+  color: var(--muted);
 }
 .encoding-note {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 10px;
-  color: #96a4b9;
+  color: var(--muted);
   background: #f7f9fc;
   padding: 12px;
   border-radius: 5px;
@@ -1673,7 +1683,7 @@ svg {
 .platform-note {
   font-size: 11px;
   line-height: 1.6;
-  color: #a98a50;
+  color: #765214;
   background: #fff9ed;
   padding: 12px;
   border-radius: 5px;
@@ -1681,7 +1691,7 @@ svg {
 }
 .output-status {
   font-size: 11px;
-  color: #838fa4;
+  color: var(--muted);
   margin: 8px 0;
 }
 .output-status span:last-child {
@@ -1690,7 +1700,7 @@ svg {
   font-size: 10px;
 }
 .output-status.failed {
-  color: #c5665c;
+  color: #a3362c;
 }
 .invite-link {
   display: flex;
@@ -1711,7 +1721,7 @@ svg {
   letter-spacing: -1px;
 }
 .resume-page p {
-  color: #8c96a9;
+  color: var(--muted);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -1882,7 +1892,8 @@ svg {
     padding: 8px 12px;
     font-size: 9px;
   }
-  .preview-banner button {
+  .preview-banner button,
+  .preview-banner .text-link {
     font-size: 9px;
   }
   .studio-workspace {

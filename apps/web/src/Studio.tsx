@@ -495,7 +495,7 @@ export function Studio({
                 onClick={() => (status?.live ? setEndDialog(true) : void start())}
               >
                 <Radio size={15} />
-                {actionBusy ? "Please wait…" : status?.live ? "End stream" : "Go live"}
+                {actionBusy ? "Please wait…" : status?.live ? "End stream" : "Start streaming"}
               </Button>
             </>
           )}
@@ -520,9 +520,23 @@ export function Studio({
         <div className="preview-banner">
           <Info size={15} />
           <span>
-            Video output is running. Confirm the preview and Go live or Auto-start in X / YouTube.
-            Twitch starts automatically when it receives video.
+            Sending video. Confirm viewer playback in each platform dashboard. YouTube’s Stream tab
+            starts from the encoder; scheduled broadcasts need Go live or Auto-start.
           </span>
+          {status.groups.some((g) =>
+            g.destinations.some(
+              (d) => d.platform === "youtube" && ["active", "starting"].includes(d.status),
+            ),
+          ) && (
+            <a
+              className="text-link"
+              href="https://studio.youtube.com"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open YouTube Studio
+            </a>
+          )}
         </div>
       )}
       {!connected && !preview && (

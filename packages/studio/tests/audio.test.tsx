@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { Track } from "livekit-client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { initialState, layouts, type StudioState } from "@studio/contracts";
+import { initialState, layouts, type StudioState, type Asset } from "@studio/contracts";
 import { programVoices, ProgramCanvas, type Source } from "../src";
 const sources: Source[] = ["host", "guest-1", "guest-2", "guest-3"].map((identity, i) => ({
   identity,
@@ -46,4 +46,22 @@ test("all eight layouts render with four camera-off humans and a selected screen
     if (layout.screen) expect(html).toContain("program-screen");
     else expect(html).toContain("program-camera");
   }
+});
+test("sound effects preload while idle and monitoring never starts an idle cue", () => {
+  const asset: Asset = {
+    id: "clap",
+    category: "sounds",
+    name: "Clap",
+    filename: "clap.ogg",
+    url: "/clap.ogg",
+    kind: "audio",
+    version: "1",
+  };
+  const html = renderToStaticMarkup(
+    <ProgramCanvas state={initialState()} sources={[]} assets={[asset]} effectsAudio />,
+  );
+  expect(html).toContain('preload="auto"');
+  expect(html).toContain('data-media-asset="clap"');
+  expect(html).toContain('data-media-playback="paused"');
+  expect(html).not.toContain("autoPlay");
 });

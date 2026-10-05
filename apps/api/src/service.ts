@@ -398,8 +398,10 @@ export class StudioService {
         : undefined;
       const encoding = readEncoding(job);
       const failed = [EgressStatus.EGRESS_FAILED, EgressStatus.EGRESS_ABORTED].includes(job.status);
-      const outputs = job.streamResults.length
-        ? job.streamResults
+      const streamResults =
+        job.result.case === "stream" ? job.result.value.info : job.streamResults;
+      const outputs = streamResults.length
+        ? streamResults
         : requestURLs(job).map((url) => ({
             url,
             status: failed

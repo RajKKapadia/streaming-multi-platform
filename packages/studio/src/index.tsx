@@ -144,7 +144,7 @@ export function SyncedMedia({
   onAudioBlocked,
   onReady,
 }: {
-  playback: Playback;
+  playback: Playback | null;
   asset?: Asset;
   clockOffset: number;
   audio: boolean;
@@ -162,15 +162,27 @@ export function SyncedMedia({
     if (!el) return;
     let disposed = false,
       starting = false,
-      blocked = false;
+      blocked = false,
+      needsSeek = true;
     const sync = () => {
       const { playback: p, clockOffset, audio, onError, onAudioBlocked } = current.current,
-        position = playbackPosition(p, Date.now() + clockOffset);
-      el.volume = p.volume;
+        position = p ? playbackPosition(p, Date.now() + clockOffset) : 0;
       el.muted = !audio;
+      if (!p) {
+        el.pause();
+        return;
+      }
+      el.volume = p.volume;
       el.loop = p.loop;
+      if (el.error) {
+        onError?.(
+          `Cannot play ${asset?.name ?? "this file"}. Check the file format and Refresh the library.`,
+        );
+        return;
+      }
       if (el.readyState < 1) return;
-      if (Math.abs(el.currentTime - position) > 0.35) el.currentTime = position;
+      if (needsSeek || Math.abs(el.currentTime - position) > 0.35) el.currentTime = position;
+      needsSeek = false;
       if (p.playing && (p.loop || position < p.duration)) {
         if (el.paused && !starting) {
           starting = true;
@@ -205,10 +217,12 @@ export function SyncedMedia({
       sync();
       current.current.onReady?.();
     };
-    const failed = () =>
-      current.current.onError?.(
-        `Cannot play ${asset?.name ?? "this file"}. Check the file format and Refresh the library.`,
-      );
+    const failed = () => {
+      if (current.current.playback)
+        current.current.onError?.(
+          `Cannot play ${asset?.name ?? "this file"}. Check the file format and Refresh the library.`,
+        );
+    };
     el.addEventListener("loadedmetadata", sync);
     el.addEventListener("loadeddata", ready);
     el.addEventListener("error", failed);
@@ -227,7 +241,7 @@ export function SyncedMedia({
       window.removeEventListener("pointerdown", sync);
       window.removeEventListener("keydown", sync);
     };
-  }, [playback.id, asset?.url, asset?.name]);
+  }, [playback?.id, asset?.url, asset?.name]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: changes to playback, audio, and the clock need immediate synchronization.
   useEffect(() => {
     synchronize.current?.();
@@ -237,7 +251,8 @@ export function SyncedMedia({
     src: asset.url,
     preload: "auto",
     muted: !audio,
-    "data-media-playback": playback.playing ? "playing" : "paused",
+    "data-media-playback": playback?.playing ? "playing" : "paused",
+    "data-media-asset": asset.id,
   } as const;
   return asset.kind === "video" ? (
     <video
@@ -443,20 +458,31 @@ export function ProgramCanvas({
             />
           ))}
         {programAudio && !state.clip && screen?.screenAudio && <Voice track={screen.screenAudio} />}
-        {!state.clip &&
-          (["music", "sound"] as const).map((channel) =>
-            state[channel] ? (
-              <SyncedMedia
-                key={state[channel]!.id}
-                playback={state[channel]!}
-                asset={lookup(state[channel]!.assetId)}
-                clockOffset={clockOffset}
-                audio={effectsAudio}
-                onError={onMediaError}
-                onAudioBlocked={onAudioBlocked}
-              />
-            ) : null,
-          )}
+        {!state.clip && state.music && (
+          <SyncedMedia
+            key={state.music.id}
+            playback={state.music}
+            asset={lookup(state.music.assetId)}
+            clockOffset={clockOffset}
+            audio={effectsAudio}
+            onError={onMediaError}
+            onAudioBlocked={onAudioBlocked}
+          />
+        )}
+        {/* Keep effects loaded between cues and reuse the element when the same sound replays. */}
+        {assets
+          .filter((asset) => asset.category === "sounds")
+          .map((asset) => (
+            <SyncedMedia
+              key={`sound-${asset.id}`}
+              playback={!state.clip && state.sound?.assetId === asset.id ? state.sound : null}
+              asset={asset}
+              clockOffset={clockOffset}
+              audio={effectsAudio}
+              onError={onMediaError}
+              onAudioBlocked={onAudioBlocked}
+            />
+          ))}
       </div>
     </div>
   );

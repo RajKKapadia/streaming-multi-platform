@@ -222,8 +222,8 @@ export function Destinations({
           {selected !== "twitch" && (
             <p className="platform-note">
               {selected === "x"
-                ? "Enable X, save, then click Go live in this studio to send video. Wait for the preview in X Live Studio before clicking Go Live there (or use its auto-start setting). If X is waiting for a stream, check the output status below. The default 1080p30 profile works with legacy Producer; check your source’s Recommended Encoder Settings before selecting 60 fps."
-                : "Enable YouTube, save, then click Go live in this studio. Wait for the preview in YouTube Studio and click Go live there, or enable Auto-start for that broadcast. A saved stream key alone does not send video."}
+                ? "Enable X, save, then click Start streaming in this studio to send video. Wait for the preview in X Live Studio before clicking Go Live there (or use its auto-start setting). If X is waiting for a stream, check the output status below. The default 1080p30 profile works with legacy Producer; check your source’s Recommended Encoder Settings before selecting 60 fps."
+                : "Enable YouTube, save, then click Start streaming here. YouTube’s immediate Stream tab starts when video arrives. For scheduled broadcasts, wait for the preview, then click Go live or use Auto-start. If YouTube stays Preparing or No data, check that its selected stream key matches this destination and inspect Stream health. Confirm playback on the YouTube watch page."}
             </p>
           )}
           {status?.groups.flatMap((g) =>

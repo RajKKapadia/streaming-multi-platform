@@ -311,6 +311,23 @@ describe("broadcast management", () => {
       true,
     );
   });
+  test("current Egress stream results report individual failures instead of assuming delivery", async () => {
+    const f = fixture();
+    await f.service.updateDestinations("personal", ds());
+    await f.service.start("personal");
+    const job = f.gateway.jobs[0]!;
+    const results = job.streamResults;
+    results[0]!.status = 2;
+    results[0]!.error = "Provider error including private-youtube-key";
+    job.streamResults = [];
+    job.result = new EgressInfo({ result: { case: "stream", value: { info: results } } }).result;
+    const status = await f.service.status("personal");
+    const outputs = status.groups[0]!.destinations;
+    expect(outputs.find((d) => d.platform === "youtube")?.status).toBe("failed");
+    expect(outputs.find((d) => d.platform === "twitch")?.status).toBe("active");
+    expect(outputs.find((d) => d.platform === "youtube")?.error).toContain("output failed");
+    expect(JSON.stringify(status)).not.toContain("private-");
+  });
   test("groups profiles, serializes duplicate starts and masks all keys", async () => {
     const f = fixture();
     await f.service.updateDestinations("personal", ds());
