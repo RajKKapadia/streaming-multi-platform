@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Track, type Room, type Participant } from "livekit-client";
+import { SoundPlayback } from "./sound-playback";
 import {
   playbackPosition,
   settleState,
+  nextPlaybackEnd,
   type StudioState,
   type Asset,
   type Playback,
@@ -140,6 +142,7 @@ export function SyncedMedia({
   asset,
   clockOffset,
   audio,
+  cancelPlayback = false,
   onError,
   onAudioBlocked,
   onReady,
@@ -148,26 +151,59 @@ export function SyncedMedia({
   asset?: Asset;
   clockOffset: number;
   audio: boolean;
+  cancelPlayback?: boolean;
   onError?: (message: string) => void;
   onAudioBlocked?: () => void;
   onReady?: () => void;
 }) {
   const ref = useRef<HTMLMediaElement>(null),
-    current = useRef({ playback, clockOffset, audio, onError, onAudioBlocked, onReady }),
+    current = useRef({
+      playback,
+      clockOffset,
+      audio,
+      cancelPlayback,
+      onError,
+      onAudioBlocked,
+      onReady,
+    }),
     synchronize = useRef<(() => void) | null>(null);
-  current.current = { playback, clockOffset, audio, onError, onAudioBlocked, onReady };
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new playback or media URL must rebind the element, without pausing on clock updates.
+  current.current = {
+    playback,
+    clockOffset,
+    audio,
+    cancelPlayback,
+    onError,
+    onAudioBlocked,
+    onReady,
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: playback and clock changes synchronize through current without rebinding the player.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     let disposed = false,
       starting = false,
       blocked = false,
-      needsSeek = true;
+      needsSeek = true,
+      playbackId: string | null = null;
+    const sound = asset?.category === "sounds" ? new SoundPlayback() : null;
     const sync = () => {
-      const { playback: p, clockOffset, audio, onError, onAudioBlocked } = current.current,
-        position = p ? playbackPosition(p, Date.now() + clockOffset) : 0;
+      const { playback, clockOffset, audio, cancelPlayback, onError, onAudioBlocked } =
+        current.current;
+      const now = Date.now() + clockOffset,
+        cue = sound?.update(playback, now, cancelPlayback),
+        p = cue ? cue.playback : playback,
+        oneShot = !!sound && !p?.loop;
+      if (cue?.restart || p?.id !== playbackId) needsSeek = true;
+      playbackId = p?.id ?? null;
+      const position = p
+        ? oneShot
+          ? needsSeek
+            ? p.position
+            : el.currentTime
+          : playbackPosition(p, now)
+        : 0;
       el.muted = !audio;
+      el.dataset.mediaPlayback = p?.playing ? "playing" : "paused";
       if (!p) {
         el.pause();
         return;
@@ -183,7 +219,7 @@ export function SyncedMedia({
       if (el.readyState < 1) return;
       if (needsSeek || Math.abs(el.currentTime - position) > 0.35) el.currentTime = position;
       needsSeek = false;
-      if (p.playing && (p.loop || position < p.duration)) {
+      if (p.playing && (oneShot || p.loop || position < p.duration)) {
         if (el.paused && !starting) {
           starting = true;
           void el
@@ -223,9 +259,14 @@ export function SyncedMedia({
           `Cannot play ${asset?.name ?? "this file"}. Check the file format and Refresh the library.`,
         );
     };
+    const ended = () => {
+      sound?.finish();
+      if (sound) el.dataset.mediaPlayback = "paused";
+    };
     el.addEventListener("loadedmetadata", sync);
     el.addEventListener("loadeddata", ready);
     el.addEventListener("error", failed);
+    el.addEventListener("ended", ended);
     window.addEventListener("pointerdown", sync);
     window.addEventListener("keydown", sync);
     sync();
@@ -238,14 +279,15 @@ export function SyncedMedia({
       el.removeEventListener("loadedmetadata", sync);
       el.removeEventListener("loadeddata", ready);
       el.removeEventListener("error", failed);
+      el.removeEventListener("ended", ended);
       window.removeEventListener("pointerdown", sync);
       window.removeEventListener("keydown", sync);
     };
-  }, [playback?.id, asset?.url, asset?.name]);
+  }, [asset?.url, asset?.name]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: changes to playback, audio, and the clock need immediate synchronization.
   useEffect(() => {
     synchronize.current?.();
-  }, [playback, audio, clockOffset]);
+  }, [playback, audio, clockOffset, cancelPlayback]);
   if (!asset) return <div className="program-missing">Media unavailable</div>;
   const props = {
     src: asset.url,
@@ -293,12 +335,18 @@ export function ProgramCanvas({
 }) {
   const container = useRef<HTMLDivElement>(null),
     [scale, setScale] = useState(1),
-    [now, setNow] = useState(Date.now());
+    [, redraw] = useState(0);
+  const state = settleState(inputState, Date.now() + clockOffset);
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 100);
-    return () => clearInterval(timer);
-  }, []);
-  const state = settleState(inputState, now + clockOffset);
+    const end = nextPlaybackEnd(state);
+    if (end === null) return;
+    // Video paints independently of React. Only media completion needs a timed redraw.
+    const timer = setTimeout(
+      () => redraw((v) => v + 1),
+      Math.max(1, Math.ceil(end - Date.now() - clockOffset) + 1),
+    );
+    return () => clearTimeout(timer);
+  }, [state, clockOffset]);
   useEffect(() => {
     if (!container.current) return;
     const observer = new ResizeObserver(([entry]) => setScale(entry!.contentRect.width / 1920));
@@ -367,7 +415,7 @@ export function ProgramCanvas({
       break;
     case "screen-presenter":
       screens.push(rect(featured ? 600 : 48, 90, featured ? 1272 : 1824, 900));
-      if (featured) tiles.push({ source: featured, style: rect(48, 90, 528, 900) });
+      if (featured) tiles.push({ source: featured, style: rect(48, 180, 528, 720) });
       break;
     case "screen-rail":
       screens.push(rect(staged.length ? 402 : 48, 48, staged.length ? 1470 : 1824, 984));
@@ -375,7 +423,7 @@ export function ProgramCanvas({
       break;
     case "pip":
       screens.push(rect(0, 0, 1920, 1080));
-      if (featured) tiles.push({ source: featured, style: rect(48, 756, 432, 276) });
+      if (featured) tiles.push({ source: featured, style: rect(1440, 48, 432, 276) });
       break;
     case "screen-only":
       screens.push(rect(0, 0, 1920, 1080));
@@ -475,10 +523,15 @@ export function ProgramCanvas({
           .map((asset) => (
             <SyncedMedia
               key={`sound-${asset.id}`}
-              playback={!state.clip && state.sound?.assetId === asset.id ? state.sound : null}
+              playback={
+                !state.clip && inputState.sound?.assetId === asset.id ? inputState.sound : null
+              }
               asset={asset}
               clockOffset={clockOffset}
-              audio={effectsAudio}
+              audio={effectsAudio && !state.clip}
+              cancelPlayback={
+                !!state.clip || (!!inputState.sound && inputState.sound.assetId !== asset.id)
+              }
               onError={onMediaError}
               onAudioBlocked={onAudioBlocked}
             />

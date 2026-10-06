@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Camera, Mic, Sparkles, Settings as SettingsIcon, Headphones } from "lucide-react";
 import { Dialog, Button, Input, Select, Switch } from "@studio/ui";
 import { VideoTrack } from "@studio/rendering";
@@ -10,12 +10,14 @@ export function Settings({
   onClose,
   capture,
   loadBackgrounds,
+  backgroundAccess,
   autoEnableCamera = false,
 }: {
   open: boolean;
   onClose: () => void;
   capture: Capture;
   loadBackgrounds: () => Promise<Asset[]>;
+  backgroundAccess?: ReactNode;
   autoEnableCamera?: boolean;
 }) {
   const p = usePreferences(),
@@ -27,13 +29,16 @@ export function Settings({
     [loadingImage, setLoadingImage] = useState(false),
     [saving, setSaving] = useState(false);
   const backgroundRequest = useRef(0);
+  const backgroundLoader = useRef(loadBackgrounds);
+  backgroundLoader.current = loadBackgrounds;
+  const needsBackgroundAccess = !!backgroundAccess;
   const settings = capture.camera?.mediaStreamTrack.getSettings();
   const refreshBackgrounds = useCallback(async () => {
     const request = ++backgroundRequest.current;
     setLoadingBackgrounds(true);
     setBackgroundsError("");
     try {
-      const assets = await loadBackgrounds();
+      const assets = await backgroundLoader.current();
       if (request === backgroundRequest.current)
         setBackgrounds(assets.filter((a) => a.category === "backgrounds"));
     } catch (e) {
@@ -44,7 +49,8 @@ export function Settings({
     } finally {
       if (request === backgroundRequest.current) setLoadingBackgrounds(false);
     }
-  }, [loadBackgrounds]);
+  }, []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Reload after setup signs in while the dialog is open, without retrying on each credential edit.
   useEffect(() => {
     if (!open) return;
     setBackgrounds([]);
@@ -52,7 +58,7 @@ export function Settings({
     return () => {
       backgroundRequest.current++;
     };
-  }, [open, refreshBackgrounds]);
+  }, [open, refreshBackgrounds, needsBackgroundAccess]);
   const chooseImage = async (file?: File) => {
     if (!file) return;
     setLoadingImage(true);
@@ -228,6 +234,7 @@ export function Settings({
               </label>
               {p.effect === "image" && (
                 <>
+                  {backgroundAccess}
                   <label>
                     Background image
                     <Select
@@ -250,7 +257,9 @@ export function Settings({
                             ? "Choose an image"
                             : backgroundsError
                               ? "Background library unavailable"
-                              : "No library images available"}
+                              : backgroundAccess
+                                ? "Sign in to load images"
+                                : "No library images available"}
                       </option>
                       {p.localBackground && <option value="local">{p.localBackground.name}</option>}
                       {backgrounds.map((a) => (
@@ -265,7 +274,11 @@ export function Settings({
                     disabled={loadingBackgrounds || saving}
                     onClick={() => void refreshBackgrounds()}
                   >
-                    {loadingBackgrounds ? "Loading backgrounds…" : "Refresh backgrounds"}
+                    {loadingBackgrounds
+                      ? "Loading backgrounds…"
+                      : backgroundAccess
+                        ? "Load backgrounds"
+                        : "Refresh backgrounds"}
                   </Button>
                   {backgroundsError && (
                     <p role="alert" className="error">

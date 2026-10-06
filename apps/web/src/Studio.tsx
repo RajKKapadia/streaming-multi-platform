@@ -115,7 +115,7 @@ export function LayoutGlyph({ id }: { id: LayoutId }) {
         <>
           <rect className="glyph-screen" x="5" y="5" width="42" height="24" rx="1" />
           <g className="glyph-inset">
-            <GlyphPerson x={12} y={25} size={0.5} />
+            <GlyphPerson x={40} y={10} size={0.5} />
           </g>
         </>
       )}

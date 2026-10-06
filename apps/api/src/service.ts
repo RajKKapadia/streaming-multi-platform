@@ -6,6 +6,7 @@ import {
   stateSchema,
   defaultDestinationURLs,
   defaultPlatformEncoding,
+  encodingSchema,
   platformIds,
   messageHistoryLimit,
   messageInputSchema,
@@ -290,14 +291,18 @@ export class StudioService {
         key:
           d.key === undefined ? previous.find((p) => p.platform === d.platform)?.key : d.key.trim(),
         encoding: {
-          ...d.encoding,
+          ...encodingSchema.parse(d.encoding),
           keyframeInterval: d.platform === "x" ? (3 as const) : (2 as const),
         },
       }));
       for (const d of next) {
         if (d.url) validateURL(d.url);
-        if (d.platform !== "x" && d.encoding.fps !== 60)
-          throw new Error("Use a 60 fps profile for YouTube and Twitch.");
+        if (d.platform !== "x" && (d.encoding.fps !== 60 || d.encoding.height !== 1080))
+          throw new Error("Use a 1080p60 profile for YouTube and Twitch.");
+        if (d.platform === "x" && d.encoding.height === 1080 && d.encoding.fps !== 30)
+          throw new Error("X supports 1080p30 or 720p60. Choose 720p60 for smoother motion.");
+        if (d.platform === "x" && d.encoding.bitrate > 12000)
+          throw new Error("X supports a maximum video bitrate of 12000 kbps.");
         if (d.enabled && !d.url) throw new Error(`Enter the server URL from X Live Studio.`);
         if (d.enabled && !d.key) throw new Error(`Enter a stream key for ${d.platform}.`);
       }
@@ -494,8 +499,8 @@ function readEncoding(job: EgressInfo): Encoding {
         : undefined;
   const options = encoding?.case === "advanced" ? encoding.value : null;
   return {
-    width: 1920,
-    height: 1080,
+    width: options?.width === 1280 ? 1280 : 1920,
+    height: options?.height === 720 ? 720 : 1080,
     fps: options?.framerate === 30 ? 30 : 60,
     bitrate: options?.videoBitrate ?? 6000,
     keyframeInterval: options?.keyFrameInterval === 3 ? 3 : 2,

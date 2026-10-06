@@ -168,11 +168,12 @@ function restoreClip(s: StudioState, now: number) {
   s.resumeMusicAfterClip = false;
 }
 export function settleState(state: StudioState, now: number): StudioState {
-  const s = structuredClone(state);
+  let s = state;
   let changed = false;
   for (const channel of ["clip", "music", "sound"] as const) {
     const p = s[channel];
     if (p?.playing && !p.loop && playbackPosition(p, now) >= p.duration) {
+      if (!changed) s = structuredClone(state);
       if (channel === "clip") restoreClip(s, p.startedAt + (p.duration - p.position) * 1000);
       else s[channel] = null;
       changed = true;
@@ -180,6 +181,12 @@ export function settleState(state: StudioState, now: number): StudioState {
   }
   if (changed) s.revision++;
   return changed ? s : state;
+}
+export function nextPlaybackEnd(state: StudioState): number | null {
+  const ends = [state.clip, state.music, state.sound]
+    .filter((p): p is Playback => !!p?.playing && !p.loop)
+    .map((p) => p.startedAt + Math.max(0, p.duration - p.position) * 1000);
+  return ends.length ? Math.min(...ends) : null;
 }
 export function applyCommand(state: StudioState, command: Command, now: number): StudioState {
   const s = structuredClone(settleState(state, now));
@@ -321,13 +328,20 @@ export type JoinResponse = {
   state: StudioState;
   serverTime: number;
 };
-export const encodingSchema = z.object({
-  width: z.literal(1920),
-  height: z.literal(1080),
-  fps: z.union([z.literal(30), z.literal(60)]),
-  bitrate: z.number().int().min(2500).max(20000),
-  keyframeInterval: z.union([z.literal(2), z.literal(3)]).optional(),
-});
+export const encodingSchema = z
+  .object({
+    width: z.union([z.literal(1280), z.literal(1920)]),
+    height: z.union([z.literal(720), z.literal(1080)]),
+    fps: z.union([z.literal(30), z.literal(60)]),
+    bitrate: z.number().int().min(2500).max(20000),
+    keyframeInterval: z.union([z.literal(2), z.literal(3)]).optional(),
+  })
+  .refine(
+    (e) => (e.width === 1280 && e.height === 720) || (e.width === 1920 && e.height === 1080),
+    {
+      message: "Choose a 1280 × 720 or 1920 × 1080 output profile.",
+    },
+  );
 export type Encoding = z.infer<typeof encodingSchema>;
 export const defaultEncoding: Encoding = { width: 1920, height: 1080, fps: 60, bitrate: 6000 };
 export const platformIds = ["youtube", "twitch", "x"] as const;
@@ -339,7 +353,7 @@ export const defaultDestinationURLs: Record<Platform, string> = {
 };
 export function defaultPlatformEncoding(platform: Platform): Encoding {
   return platform === "x"
-    ? { ...defaultEncoding, fps: 30, bitrate: 9000, keyframeInterval: 3 }
+    ? { width: 1280, height: 720, fps: 60, bitrate: 9000, keyframeInterval: 3 }
     : { ...defaultEncoding, keyframeInterval: 2 };
 }
 export const destinationSchema = z.object({

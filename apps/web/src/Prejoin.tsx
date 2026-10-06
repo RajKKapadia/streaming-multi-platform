@@ -50,10 +50,7 @@ export function Prejoin({
   }, []);
   const loadBackgrounds = useCallback(async () => {
     if (!invite && session?.studio !== studioId) {
-      if (!preferences.name.trim() || !passcode)
-        throw new Error(
-          "Enter your display name and host passcode on setup, then reopen Settings to load shared backgrounds.",
-        );
+      if (!preferences.name.trim() || !passcode) return [];
       setSession(
         await api<{ studio: string; role: string }>("/session", {
           studio: studioId,
@@ -299,6 +296,35 @@ export function Prejoin({
         onClose={() => setSettings(false)}
         capture={capture}
         loadBackgrounds={loadBackgrounds}
+        backgroundAccess={
+          !invite && session?.studio !== studioId ? (
+            <>
+              <p className="hint">
+                Enter your display name and host passcode, then click Load backgrounds. You can
+                choose an image before entering the studio.
+              </p>
+              <label>
+                Display name
+                <Input
+                  value={preferences.name}
+                  onChange={(e) => preferences.set({ name: e.target.value })}
+                  placeholder="How should we call you?"
+                  maxLength={80}
+                />
+              </label>
+              <label>
+                Host passcode
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  placeholder="Your private studio passcode"
+                />
+              </label>
+            </>
+          ) : undefined
+        }
         autoEnableCamera
       />
     </div>

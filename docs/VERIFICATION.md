@@ -73,3 +73,28 @@ Sound effects now preload and keep one audio element per asset between cues. Eac
 UI text uses darker primary, secondary, and muted colors across setup, settings, panels, source controls, messages, and destination forms. Stage styles are unchanged; the browser still reported white participant name text. Production preview checks at 1280 × 720 and 390 × 844 found no horizontal page/header overflow and kept the device toolbar visible.
 
 All 36 repository tests passed. Workspace type checks, lint, production build, and whitespace checks passed; the existing Vite chunk-size warning remains. Temporary replay-check pages were removed, and the final production build contains the application only.
+
+## X motion and renderer work — 2026-10-06
+
+Read-only LiveKit inspection confirmed the recent X job completed at 1920 × 1080 / 30 fps / 9000 kbps, H.264 Main, AAC 128 kbps / 48 kHz, and three-second keyframes. Its output ran for about 17 minutes 57 seconds without a reported transport error. These results do not measure received frame cadence, packet loss, or X playback. The connected host's interface reported a 1080p / 30 fps camera.
+
+X now defaults to 1280 × 720 / 60 fps at 9000 kbps with three-second keyframes, following [X Producer's recommended 720p60 profile](https://help.x.com/en/using-x/how-to-use-live-producer). The selector also retains 1080p30 and offers 720p30. Server validation rejects 1080p60 for X, video bitrates above 12000 kbps, and mismatched dimensions. Tests confirm 720p60 X uses a separate Egress from 1080p60 YouTube/Twitch, and status reports the requested output dimensions. Existing saved profiles require selecting and saving the new profile before the next stream.
+
+ProgramCanvas no longer redraws every 100 ms. A single timeout handles the next finite media completion; looping or paused media requires no program clock timer. Unchanged state no longer incurs a structured clone. An isolated React Profiler harness compared the prior timer with the new scheduling: after 44 seconds the prior renderer had 442 commits, while the new renderer had two setup commits. A one-second synthetic clip still returned to the camera layout; the new renderer had four total commits after that transition. This measures React work with camera-off test content, not live encoding throughput or a reduction in dropped frames.
+
+All 39 repository tests passed with localhost networking available. All workspace TypeScript checks, lint, production build, and whitespace checks passed. The running public app served the rebuilt bundle. Browser checks in interface preview confirmed X's 720p60 default and switching to 1080p30 and back, with no browser errors. The idle API on port 3002 was restarted to load the new defaults and validation; all destinations were disabled at restart. The user's original studio tab was left unchanged, and was later closed externally. The existing large SDK chunk warning remains. Temporary profiler files and the local test server were removed. No new Egress or platform broadcast was started; received X playback with 60 fps input remains a live acceptance check.
+
+
+## Short sound effects — 2026-10-06
+
+FFmpeg fully decoded all eight sound assets and measured nonzero PCM in every file. The clips are not empty: Bong, Buzzer, and Scratch last only 0.123–0.165 seconds; Switch lasts 0.618 seconds but most of its audio is at the beginning.
+
+An isolated Chrome harness using the real OGG files and the current ProgramCanvas reproduced the silence. A 350 ms simulated state-delivery delay skipped Bong, Buzzer, Scratch, and Switch entirely. At 2.2 seconds, only applause and laughter produced audio, matching the reported symptom. Shared elapsed-time seeking skipped the short effects; shared expiry could also remove a cue before local playback began.
+
+One-shot sounds now start at their initial position when a new cue arrives and finish on the media element's ended event. Naturally expired shared state preserves the local tail. Explicit stops before expiry, other sound cues, and video clips cancel playback. Completed cue IDs do not replay on repeated state snapshots, and stale room metadata is rejected. Looping sounds, music, and video retain clock-based synchronization.
+
+After the fix, all eight effects produced nonzero decoded browser PCM at both 350 ms and 2.2 seconds of delivery delay. In the 2.2-second check, each started at time zero and emitted exactly one playing event and one ended event. Peak RMS values ranged from approximately 0.143 to 0.586. Completed Bong replay and two rapid applause retriggers also passed while background music continued playing; the applause position was about 0.044 seconds after its final retrigger.
+
+These checks establish local browser decoding and playback, not physical speaker output or streaming-platform receipt. Temporary browser-check sources were removed before the production build.
+
+All 44 repository tests passed with localhost networking enabled. Lint, workspace type checks, production build, and whitespace checks passed. The running API on port 3002 served the new JavaScript bundle byte-for-byte, including the sound cue logic. Existing studio pages need a refresh to load it. The existing Vite chunk-size warning remains.

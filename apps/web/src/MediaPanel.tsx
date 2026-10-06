@@ -323,7 +323,7 @@ export function MediaPanel({
       </section>
       <section className="media-section">
         <h3>
-          Background
+          Stage background
           <ChevronDown size={15} />
         </h3>
         <div className="asset-grid">
@@ -337,20 +337,6 @@ export function MediaPanel({
             >
               <div className="asset-thumb" style={{ background: value }} />
               <span>{key.charAt(0).toUpperCase() + key.slice(1)}</span>
-            </button>
-          ))}
-          {byCategory("backgrounds").map((a) => (
-            <button
-              key={a.id}
-              className={`asset-card ${state.background.value === a.id ? "selected" : ""}`}
-              onClick={() =>
-                execute({ type: "background", background: { kind: "image", value: a.id } })
-              }
-            >
-              <div className="asset-thumb">
-                <img src={a.url} alt="" />
-              </div>
-              <span>{a.name}</span>
             </button>
           ))}
         </div>
@@ -370,6 +356,7 @@ export function MediaPanel({
             Solid color
           </label>
         </div>
+        <p className="hint">Camera backgrounds are in Settings → Visual effects.</p>
       </section>
       <section className="media-section">
         <h3>

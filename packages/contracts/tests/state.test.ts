@@ -1,6 +1,43 @@
 import { describe, test, expect } from "bun:test";
-import { applyCommand, initialState, playbackPosition, settleState, type Command } from "../src";
+import {
+  applyCommand,
+  initialState,
+  playbackPosition,
+  settleState,
+  nextPlaybackEnd,
+  type Command,
+} from "../src";
 describe("program transitions", () => {
+  test("only playing, finite media schedules a program redraw, including music resumed after a clip", () => {
+    let s = initialState();
+    expect(nextPlaybackEnd(s)).toBeNull();
+    s = applyCommand(
+      s,
+      { type: "play", channel: "music", assetId: "m", duration: 20, loop: true, volume: 1 },
+      1000,
+    );
+    expect(nextPlaybackEnd(s)).toBeNull();
+    s = applyCommand(s, { type: "loop", channel: "music", loop: false }, 5000);
+    expect(nextPlaybackEnd(s)).toBe(21000);
+    s = applyCommand(
+      s,
+      { type: "play", channel: "clip", assetId: "c", duration: 5, loop: false, volume: 1 },
+      6000,
+    );
+    expect(nextPlaybackEnd(s)).toBe(11000);
+    const before = structuredClone(s);
+    const finished = settleState(s, 11000);
+    expect(s).toEqual(before);
+    expect(finished.clip).toBeNull();
+    expect(nextPlaybackEnd(finished)).toBe(26000);
+    const paused = applyCommand(
+      finished,
+      { type: "playback", channel: "music", action: "pause" },
+      12000,
+    );
+    expect(nextPlaybackEnd(paused)).toBeNull();
+    expect(settleState(paused, 90000)).toBe(paused);
+  });
   test("stage order, feature, capacity and selected screen termination", () => {
     let s = initialState();
     for (const identity of ["host", "guest-1", "guest-2", "guest-3"])

@@ -186,18 +186,28 @@ export function Destinations({
             <label>
               Output profile
               <Select
-                value={current.encoding.fps}
+                value={`${current.encoding.height}p${current.encoding.fps}`}
                 disabled={!!status?.live}
                 onChange={(e) =>
                   change({
-                    encoding: { ...current.encoding, fps: Number(e.target.value) as 30 | 60 },
+                    encoding: {
+                      ...current.encoding,
+                      width: e.target.value.startsWith("720") ? 1280 : 1920,
+                      height: e.target.value.startsWith("720") ? 720 : 1080,
+                      fps: e.target.value.endsWith("30") ? 30 : 60,
+                    },
                   })
                 }
               >
-                {selected === "x" && <option value="30">1080p30 · X compatibility</option>}
-                <option value="60">
-                  {selected === "x" ? "1080p60 · check X source support" : "1080p60"}
-                </option>
+                {selected === "x" ? (
+                  <>
+                    <option value="720p60">720p60 · smoother motion (recommended)</option>
+                    <option value="1080p30">1080p30 · sharper detail</option>
+                    <option value="720p30">720p30 · lower encoding load</option>
+                  </>
+                ) : (
+                  <option value="1080p60">1080p60</option>
+                )}
               </Select>
             </label>
             <label>
@@ -205,7 +215,7 @@ export function Destinations({
               <Input
                 type="number"
                 min={2500}
-                max={20000}
+                max={selected === "x" ? 12000 : 20000}
                 step={500}
                 value={current.encoding.bitrate}
                 disabled={!!status?.live}
@@ -222,7 +232,7 @@ export function Destinations({
           {selected !== "twitch" && (
             <p className="platform-note">
               {selected === "x"
-                ? "Enable X, save, then click Start streaming in this studio to send video. Wait for the preview in X Live Studio before clicking Go Live there (or use its auto-start setting). If X is waiting for a stream, check the output status below. The default 1080p30 profile works with legacy Producer; check your source’s Recommended Encoder Settings before selecting 60 fps."
+                ? "720p60 gives smoother motion on X when your camera, screen share, or clip supplies 60 fps. Choose 1080p30 for finer detail or 720p30 for lower encoding load. Save, then Start streaming here and confirm the preview in X Live Studio before going live."
                 : "Enable YouTube, save, then click Start streaming here. YouTube’s immediate Stream tab starts when video arrives. For scheduled broadcasts, wait for the preview, then click Go live or use Auto-start. If YouTube stays Preparing or No data, check that its selected stream key matches this destination and inspect Stream health. Confirm playback on the YouTube watch page."}
             </p>
           )}
@@ -232,7 +242,8 @@ export function Destinations({
               .map((d, i) => (
                 <p className={`output-status ${d.status}`} key={`${g.id}-${i}`}>
                   <span className="tiny-dot" />
-                  {d.status === "active" ? "Sending video" : d.status} · {g.encoding.fps} fps
+                  {d.status === "active" ? "Sending video" : d.status} · {g.encoding.height}p
+                  {g.encoding.fps}
                   {d.error && <span>{d.error}</span>}
                 </p>
               )),

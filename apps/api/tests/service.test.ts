@@ -14,6 +14,7 @@ import {
 import {
   initialState,
   defaultEncoding,
+  defaultPlatformEncoding,
   type StudioState,
   type ParticipantInfo,
   type Destination,
@@ -79,8 +80,8 @@ export class FakeGateway implements Gateway {
           encoding: {
             case: "advanced",
             value: new EncodingOptions({
-              width: 1920,
-              height: 1080,
+              width: encoding.width,
+              height: encoding.height,
               framerate: encoding.fps,
               videoBitrate: encoding.bitrate,
               keyFrameInterval: encoding.keyframeInterval ?? 2,
@@ -281,6 +282,57 @@ describe("broadcast management", () => {
     expect(f.service.destinations("personal").map((d) => ({ url: d.url, key: d.key }))).toEqual(
       destinations.map((d) => ({ url: d.url, key: d.key })),
     );
+  });
+  test("720p60 X stays separate from 1080p60 outputs and reports its actual dimensions", async () => {
+    const f = fixture();
+    await f.service.updateDestinations(
+      "personal",
+      ds().map((d) => ({
+        ...d,
+        encoding: defaultPlatformEncoding(d.platform),
+      })),
+    );
+    const status = await f.service.start("personal");
+    expect(f.gateway.starts).toBe(2);
+    const x = status.groups.find((g) => g.destinations.some((d) => d.platform === "x"))!;
+    expect(x.encoding).toEqual(defaultPlatformEncoding("x"));
+    expect(x.destinations).toHaveLength(1);
+    const other = status.groups.find((g) => g !== x)!;
+    expect(other.encoding.height).toBe(1080);
+    expect(other.encoding.fps).toBe(60);
+    expect(other.destinations).toHaveLength(2);
+  });
+  test("X rejects unsupported 1080p60, excessive bitrates, and mismatched dimensions", async () => {
+    const f = fixture();
+    const changeX = (encoding: Encoding) =>
+      ds().map((d) => (d.platform === "x" ? { ...d, encoding } : d));
+    await expect(
+      f.service.updateDestinations(
+        "personal",
+        changeX({ ...defaultPlatformEncoding("x"), width: 1920, height: 1080 }),
+      ),
+    ).rejects.toThrow("1080p30 or 720p60");
+    await expect(
+      f.service.updateDestinations(
+        "personal",
+        changeX({ ...defaultPlatformEncoding("x"), bitrate: 12500 }),
+      ),
+    ).rejects.toThrow("12000");
+    await expect(
+      f.service.updateDestinations(
+        "personal",
+        changeX({ ...defaultPlatformEncoding("x"), height: 1080 }),
+      ),
+    ).rejects.toThrow("output profile");
+    await expect(
+      f.service.updateDestinations(
+        "personal",
+        ds().map((d) =>
+          d.platform === "youtube" ? { ...d, encoding: defaultPlatformEncoding("x") } : d,
+        ),
+      ),
+    ).rejects.toThrow("1080p60 profile");
+    expect(f.gateway.starts).toBe(0);
   });
   test("aborted renderer startup is reported as failed with actionable, safe details", async () => {
     const f = fixture();

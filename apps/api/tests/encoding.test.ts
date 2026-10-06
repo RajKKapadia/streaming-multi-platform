@@ -15,9 +15,11 @@ test("the Egress adapter explicitly requests 1080p60, H264 Main and AAC", () => 
   expect(e.audioFrequency).toBe(48000);
   expect(e.keyFrameInterval).toBe(2);
 });
-test("X defaults to its own 1080p30 encoding and three-second keyframes", () => {
+test("X defaults to its own 720p60 encoding and three-second keyframes", () => {
   const x = createEncodingOptions(defaultPlatformEncoding("x"));
-  expect(x.framerate).toBe(30);
+  expect(x.width).toBe(1280);
+  expect(x.height).toBe(720);
+  expect(x.framerate).toBe(60);
   expect(x.videoBitrate).toBe(9000);
   expect(x.keyFrameInterval).toBe(3);
   for (const platform of ["youtube", "twitch"] as const) {
