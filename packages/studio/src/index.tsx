@@ -423,7 +423,7 @@ export function ProgramCanvas({
       break;
     case "pip":
       screens.push(rect(0, 0, 1920, 1080));
-      if (featured) tiles.push({ source: featured, style: rect(1440, 48, 432, 276) });
+      if (featured) tiles.push({ source: featured, style: rect(1548, 48, 324, 276) });
       break;
     case "screen-only":
       screens.push(rect(0, 0, 1920, 1080));

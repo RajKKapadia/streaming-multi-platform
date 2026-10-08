@@ -41,6 +41,7 @@ export function useCapture() {
   }, [
     camera,
     preferences.effect,
+    preferences.foregroundMode,
     preferences.blurRadius,
     preferences.backgroundId,
     preferences.localBackground?.url,
@@ -200,8 +201,7 @@ export function applyCameraEffect(camera: LocalVideoTrack): Promise<void> {
         if (camera.getProcessor()) await camera.stopProcessor();
         return;
       }
-      const { BackgroundProcessor, BackgroundProcessorWrapper, supportsBackgroundProcessors } =
-        await import("@livekit/track-processors");
+      const { supportsBackgroundProcessors } = await import("@livekit/track-processors");
       if (!supportsBackgroundProcessors())
         throw new Error("Camera effects are unavailable in this browser.");
       const options =
@@ -209,8 +209,23 @@ export function applyCameraEffect(camera: LocalVideoTrack): Promise<void> {
           ? { mode: "background-blur" as const, blurRadius: p.blurRadius }
           : { mode: "virtual-background" as const, imagePath: background! };
       const processor = camera.getProcessor();
-      if (processor instanceof BackgroundProcessorWrapper) await processor.switchTo(options);
-      else await camera.setProcessor(BackgroundProcessor(options));
+      const { StableBackgroundProcessor, stableBackgroundProcessor } = await import(
+        "./background-processor"
+      );
+      if (
+        processor instanceof StableBackgroundProcessor &&
+        processor.foregroundMode === p.foregroundMode
+      )
+        await processor.switchTo(options);
+      else {
+        await camera.setProcessor(
+          stableBackgroundProcessor(
+            p.effect === "blur" ? { blurRadius: p.blurRadius } : { imagePath: background! },
+            p.fps,
+            p.foregroundMode,
+          ),
+        );
+      }
     });
   pendingEffects.set(camera, pending);
   return pending;

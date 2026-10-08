@@ -241,6 +241,30 @@ export function Settings({
                   <option value="image">Virtual background</option>
                 </Select>
               </label>
+              {p.effect !== "none" && (
+                <>
+                  <label>
+                    Foreground
+                    <Select
+                      value={p.foregroundMode}
+                      aria-label="Foreground"
+                      disabled={saving || capture.applyingEffect}
+                      onChange={(e) => {
+                        p.set({ foregroundMode: e.target.value as "stable" | "person-only" });
+                        previewEffect();
+                      }}
+                    >
+                      <option value="stable">Stable foreground</option>
+                      <option value="person-only">Person only (experimental)</option>
+                    </Select>
+                  </label>
+                  <p className="hint">
+                    {p.foregroundMode === "person-only"
+                      ? "Targets hair, skin, and clothing. Some object fragments may remain. Removed objects reveal the background, including where they cover your body. May lower frame rate."
+                      : "Smoother edges with faster processing. Nearby objects may remain visible."}
+                  </p>
+                </>
+              )}
               {p.effect === "blur" && (
                 <label>
                   <span className="blur-label">

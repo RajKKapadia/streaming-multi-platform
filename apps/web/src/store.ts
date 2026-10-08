@@ -1,6 +1,7 @@
 import { initialState, type VisualPreset } from "@studio/contracts";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { CameraForegroundMode } from "./background-processor";
 type Preferences = {
   visual: VisualPreset;
   name: string;
@@ -11,6 +12,7 @@ type Preferences = {
   resolution: "1080" | "720" | "480";
   fps: 30 | 60;
   effect: "none" | "blur" | "image";
+  foregroundMode: CameraForegroundMode;
   blurRadius: number;
   backgroundId: string;
   localBackground: { url: string; name: string } | null;
@@ -33,6 +35,7 @@ export const usePreferences = create<Preferences>()(
       resolution: "1080",
       fps: 60,
       effect: "none",
+      foregroundMode: "stable",
       blurRadius: 12,
       backgroundId: "",
       localBackground: null,
