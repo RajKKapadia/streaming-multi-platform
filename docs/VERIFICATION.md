@@ -98,3 +98,11 @@ After the fix, all eight effects produced nonzero decoded browser PCM at both 35
 These checks establish local browser decoding and playback, not physical speaker output or streaming-platform receipt. Temporary browser-check sources were removed before the production build.
 
 All 44 repository tests passed with localhost networking enabled. Lint, workspace type checks, production build, and whitespace checks passed. The running API on port 3002 served the new JavaScript bundle byte-for-byte, including the sound cue logic. Existing studio pages need a refresh to load it. The existing Vite chunk-size warning remains.
+
+## Setup camera effects — 2026-10-08
+
+Setup now loads the background library without a session or form details. The public preview endpoints list and serve only background images, without issuing media tokens. HTTP tests verify anonymous access, library refresh, rejection of other media categories and missing IDs, and continued protection of the normal media and studio endpoints.
+
+Chrome checks used a simulated checkerboard camera with the real LiveKit/MediaPipe processor. With a blank display name and an incorrect passcode, selecting blur automatically enabled the camera without attempting sign-in. Increasing blur from 1 to 30 reduced measured horizontal edge detail from approximately 11.83 to 0.06 while retaining the same camera request and processed track. Local image selection immediately produced the expected red video pixels; switching between two library images produced their expected center pixels and reused the processor without restarting the camera. Rapid slider changes, effect removal, closing/reopening Settings, applying device settings, and the 390 × 844 mobile layout passed with no browser exceptions.
+
+The rebuilt app on port 3001 passed a separate check using Chrome's simulated camera: blur applied automatically, and strength 23 persisted after reloading. All 44 repository tests, workspace type checks, lint, production build, and whitespace checks passed. The local API was restarted and serves the rebuilt app. These checks verify local preview behavior; no broadcast or real-person segmentation quality test was performed.

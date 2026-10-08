@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Mic, Sparkles, Settings as SettingsIcon, Headphones } from "lucide-react";
 import { Dialog, Button, Input, Select, Switch } from "@studio/ui";
 import { VideoTrack } from "@studio/rendering";
@@ -10,14 +10,12 @@ export function Settings({
   onClose,
   capture,
   loadBackgrounds,
-  backgroundAccess,
   autoEnableCamera = false,
 }: {
   open: boolean;
   onClose: () => void;
   capture: Capture;
   loadBackgrounds: () => Promise<Asset[]>;
-  backgroundAccess?: ReactNode;
   autoEnableCamera?: boolean;
 }) {
   const p = usePreferences(),
@@ -31,7 +29,6 @@ export function Settings({
   const backgroundRequest = useRef(0);
   const backgroundLoader = useRef(loadBackgrounds);
   backgroundLoader.current = loadBackgrounds;
-  const needsBackgroundAccess = !!backgroundAccess;
   const settings = capture.camera?.mediaStreamTrack.getSettings();
   const refreshBackgrounds = useCallback(async () => {
     const request = ++backgroundRequest.current;
@@ -50,7 +47,6 @@ export function Settings({
       if (request === backgroundRequest.current) setLoadingBackgrounds(false);
     }
   }, []);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Reload after setup signs in while the dialog is open, without retrying on each credential edit.
   useEffect(() => {
     if (!open) return;
     setBackgrounds([]);
@@ -58,7 +54,14 @@ export function Settings({
     return () => {
       backgroundRequest.current++;
     };
-  }, [open, refreshBackgrounds, needsBackgroundAccess]);
+  }, [open, refreshBackgrounds]);
+  const previewEffect = () => {
+    setError("");
+    if (usePreferences.getState().effect === "none") return;
+    if (autoEnableCamera && (!capture.camera || capture.camera.isMuted))
+      void capture.enable("camera");
+    else if (!capture.camera) setError("Enable your camera to preview a camera effect.");
+  };
   const chooseImage = async (file?: File) => {
     if (!file) return;
     setLoadingImage(true);
@@ -72,6 +75,7 @@ export function Settings({
       image.src = url;
       await image.decode();
       p.set({ backgroundId: "", localBackground: { url, name: file.name } });
+      previewEffect();
     } catch (e) {
       if (url) URL.revokeObjectURL(url);
       setError(e instanceof Error ? e.message : "The background image could not be opened.");
@@ -94,7 +98,7 @@ export function Settings({
         (autoEnableCamera && p.effect !== "none" ? await capture.enable("camera") : undefined);
       if (p.effect !== "none" && !camera)
         throw new Error("Enable your camera to apply a camera effect. Check camera permissions.");
-      await applyDevices(camera, capture.microphone, backgrounds);
+      await applyDevices(camera, capture.microphone);
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -225,20 +229,49 @@ export function Settings({
                 Camera effect
                 <Select
                   value={p.effect}
-                  onChange={(e) => p.set({ effect: e.target.value as "none" })}
+                  aria-label="Camera effect"
+                  disabled={saving}
+                  onChange={(e) => {
+                    p.set({ effect: e.target.value as "none" });
+                    previewEffect();
+                  }}
                 >
                   <option value="none">None</option>
                   <option value="blur">Background blur</option>
                   <option value="image">Virtual background</option>
                 </Select>
               </label>
+              {p.effect === "blur" && (
+                <label>
+                  <span className="blur-label">
+                    Blur amount <output>{p.blurRadius}</output>
+                  </span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={30}
+                    step={1}
+                    value={p.blurRadius}
+                    aria-label="Blur amount"
+                    disabled={saving}
+                    onChange={(e) => {
+                      p.set({ blurRadius: Number(e.target.value) });
+                      previewEffect();
+                    }}
+                  />
+                  <span className="blur-scale">
+                    <span>Light</span>
+                    <span>Strong</span>
+                  </span>
+                </label>
+              )}
               {p.effect === "image" && (
                 <>
-                  {backgroundAccess}
                   <label>
                     Background image
                     <Select
                       value={p.localBackground ? "local" : p.backgroundId}
+                      aria-label="Background image"
                       disabled={
                         loadingImage ||
                         saving ||
@@ -246,8 +279,10 @@ export function Settings({
                         (!p.localBackground && !backgrounds.length)
                       }
                       onChange={(e) => {
-                        if (e.target.value !== "local")
+                        if (e.target.value !== "local") {
                           p.set({ backgroundId: e.target.value, localBackground: null });
+                          previewEffect();
+                        }
                       }}
                     >
                       <option value="">
@@ -257,9 +292,7 @@ export function Settings({
                             ? "Choose an image"
                             : backgroundsError
                               ? "Background library unavailable"
-                              : backgroundAccess
-                                ? "Sign in to load images"
-                                : "No library images available"}
+                              : "No library images available"}
                       </option>
                       {p.localBackground && <option value="local">{p.localBackground.name}</option>}
                       {backgrounds.map((a) => (
@@ -274,11 +307,7 @@ export function Settings({
                     disabled={loadingBackgrounds || saving}
                     onClick={() => void refreshBackgrounds()}
                   >
-                    {loadingBackgrounds
-                      ? "Loading backgrounds…"
-                      : backgroundAccess
-                        ? "Load backgrounds"
-                        : "Refresh backgrounds"}
+                    {loadingBackgrounds ? "Loading backgrounds…" : "Refresh backgrounds"}
                   </Button>
                   {backgroundsError && (
                     <p role="alert" className="error">
@@ -306,10 +335,14 @@ export function Settings({
                 </>
               )}
               <p className="hint">
-                Camera effects are included in your published video. Choose an image, then apply
-                settings. Shared library images load when Settings opens. After adding images, click
-                Refresh backgrounds to update the list.
+                Effects update your preview immediately and are included in your published video.
+                After adding library images, click Refresh backgrounds to update the list.
               </p>
+              {capture.applyingEffect && (
+                <p role="status" className="hint">
+                  Updating preview…
+                </p>
+              )}
             </>
           )}
           {tab === "general" && (
@@ -318,19 +351,21 @@ export function Settings({
               motion cadence. Your display name and device preferences are saved on this browser.
             </p>
           )}
-          {error && (
+          {(error || capture.effectError || capture.error) && (
             <p role="alert" className="error">
-              {error}
+              {error || capture.effectError || capture.error}
             </p>
           )}
           <div className="dialog-actions">
             <Button variant="secondary" onClick={onClose}>
-              Cancel
+              Close
             </Button>
             <Button
               onClick={save}
               disabled={
                 saving ||
+                capture.busy ||
+                capture.applyingEffect ||
                 loadingImage ||
                 (p.effect === "image" && !p.localBackground && loadingBackgrounds)
               }

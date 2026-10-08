@@ -143,6 +143,22 @@ export function createApp(config: Config, gateway?: Gateway) {
     const c = auth.verify(req.cookies["studio-session"], ["session"]);
     res.json(c?.purpose === "session" ? { role: c.role, studio: c.studio, name: c.name } : null);
   });
+  // Camera backgrounds can be tried before joining. These URLs serve only background images;
+  // they never grant a session or access to the rest of the media library.
+  app.get("/api/backgrounds", async (_req, res) => {
+    res.json({
+      assets: (await media.scan())
+        .filter((a) => a.category === "backgrounds")
+        .map((a) => ({ ...a, url: `/api/backgrounds/${a.id}?v=${a.version}` })),
+    });
+  });
+  app.get("/api/backgrounds/:id", async (req, res) => {
+    if (!media.asset(req.params.id)) await media.scan();
+    if (media.asset(req.params.id)?.category !== "backgrounds") return res.status(404).end();
+    const path = await media.path(req.params.id);
+    if (!path) return res.status(404).end();
+    res.sendFile(path, { dotfiles: "deny" });
+  });
   app.get("/api/studios/:studio/backgrounds", async (req, res) => {
     const studio = studioSchema.safeParse(req.params.studio);
     if (!studio.success) return res.status(400).json({ error: "Invalid studio identifier." });

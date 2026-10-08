@@ -649,6 +649,21 @@ test("HTTP routes enforce host authorization and scoped media access", async () 
     ).toBe(401);
     await mkdir(join(root, "backgrounds"));
     await writeFile(join(root, "backgrounds", "room.png"), "background-image");
+    const previewBackgrounds = await request("/api/backgrounds");
+    expect(previewBackgrounds.status).toBe(200);
+    const previewManifest = await previewBackgrounds.json();
+    expect(previewManifest.assets).toHaveLength(1);
+    expect(previewManifest.assets[0].category).toBe("backgrounds");
+    expect(previewManifest.assets[0].url).not.toContain("access=");
+    expect(await (await request(previewManifest.assets[0].url)).text()).toBe("background-image");
+    expect((await request("/api/session")).headers.get("set-cookie")).toBeNull();
+    expect(await (await request("/api/session")).json()).toBeNull();
+    expect((await request(`/api/backgrounds/${manifest1.assets[0].id}`)).status).toBe(404);
+    expect((await request("/api/backgrounds/missing")).status).toBe(404);
+    expect((await request(`/media/${previewManifest.assets[0].id}`)).status).toBe(401);
+    await writeFile(join(root, "backgrounds", "second.webp"), "another-background");
+    expect((await (await request("/api/backgrounds")).json()).assets).toHaveLength(2);
+    await rm(join(root, "backgrounds", "second.webp"));
     expect((await request("/api/studios/personal/backgrounds")).status).toBe(401);
     const backgrounds = await request(
       `/api/studios/personal/backgrounds?access=${encodeURIComponent(invite)}`,

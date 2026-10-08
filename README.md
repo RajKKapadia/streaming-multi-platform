@@ -71,6 +71,8 @@ Place your own licensed files in these root folders and click Refresh in Media. 
 | `media/music` | MP3, WAV, OGG | One music track; pause/resume/stop, loop, volume |
 | `media/sounds` | MP3, WAV, OGG | One sound effect at a time; preloaded repeat playback; volume |
 
+In Settings → Visual effects, try blur or a virtual background before entering a display name or passcode. Effects update the camera preview as you select them; the Blur amount slider adjusts strength from 1 to 30 and saves your choice in this browser. Library background images are available through public preview URLs; other media and studio controls require authorization. You can also choose a local image without uploading it.
+
 Use browser-compatible codecs (for example, H.264/AAC in MP4, or VP8/VP9/Opus in WebM). Playback is enabled only after browser probing succeeds; files are not transcoded. Unsupported or damaged files display an error. Images retain transparency. No upload or asset registration workflow is needed. The media endpoint supports byte ranges and rejects escaping symlinks.
 
 Clips hide live branding and exclude live microphones from the **program** without muting participants in the room. Music pauses at its current position and resumes when the clip ends or is stopped; sound effects stop. Outgoing voices remain controlled by stage membership even when their cameras are invisible in the selected layout. Removing someone from stage leaves them in the room. Guests return backstage after disconnecting.

@@ -9,13 +9,42 @@ import {
   type Room,
 } from "livekit-client";
 import { usePreferences } from "./store";
-import type { Asset } from "@studio/contracts";
 export function useCapture() {
   const [tracks, setTracks] = useState<LocalTrack[]>([]),
     [devices, setDevices] = useState<MediaDeviceInfo[]>([]),
     [error, setError] = useState(""),
+    [effectError, setEffectError] = useState(""),
+    [applyingEffect, setApplyingEffect] = useState(false),
     [busy, setBusy] = useState(false);
   const enabling = useRef(false);
+  const preferences = usePreferences();
+  const camera = tracks.find((t): t is LocalVideoTrack => t instanceof LocalVideoTrack);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: The processor reads the latest preferences when its queued update starts.
+  useEffect(() => {
+    setEffectError("");
+    setApplyingEffect(!!camera);
+    if (!camera) return;
+    let current = true;
+    void applyCameraEffect(camera)
+      .catch((e) => {
+        if (current)
+          setEffectError(
+            e instanceof Error ? e.message : "The camera effect could not be applied.",
+          );
+      })
+      .finally(() => {
+        if (current) setApplyingEffect(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [
+    camera,
+    preferences.effect,
+    preferences.blurRadius,
+    preferences.backgroundId,
+    preferences.localBackground?.url,
+  ]);
   const refresh = useCallback(
     async () => setDevices(await navigator.mediaDevices.enumerateDevices()),
     [],
@@ -79,10 +108,12 @@ export function useCapture() {
     devices,
     error,
     setError,
+    effectError,
+    applyingEffect,
     busy,
     enable,
     refresh,
-    camera: tracks.find((t): t is LocalVideoTrack => t instanceof LocalVideoTrack),
+    camera,
     microphone: tracks.find((t): t is LocalAudioTrack => t instanceof LocalAudioTrack),
   };
 }
@@ -130,15 +161,12 @@ export function useMicrophoneLevel(microphone?: LocalAudioTrack) {
 export async function applyDevices(
   camera: LocalVideoTrack | undefined,
   mic: LocalAudioTrack | undefined,
-  assets: Asset[],
 ) {
   const p = usePreferences.getState();
-  const background =
-    p.localBackground?.url ??
-    assets.find((a) => a.id === p.backgroundId && a.category === "backgrounds")?.url;
-  if (p.effect === "image" && !background)
+  if (p.effect === "image" && !p.localBackground && !p.backgroundId)
     throw new Error("Choose a background image from your computer or the media library.");
   if (camera) {
+    await pendingEffects.get(camera)?.catch(() => {});
     await camera.restartTrack({
       deviceId: p.cameraId || undefined,
       resolution: {
@@ -147,21 +175,7 @@ export async function applyDevices(
         frameRate: p.fps,
       },
     });
-    await camera.stopProcessor();
-    if (p.effect !== "none") {
-      const { BackgroundProcessor, supportsBackgroundProcessors } = await import(
-        "@livekit/track-processors"
-      );
-      if (!supportsBackgroundProcessors())
-        throw new Error("Camera effects are unavailable in this browser.");
-      await camera.setProcessor(
-        BackgroundProcessor(
-          p.effect === "blur"
-            ? { mode: "background-blur", blurRadius: 12 }
-            : { mode: "virtual-background", imagePath: background! },
-        ),
-      );
-    }
+    await applyCameraEffect(camera);
   }
   if (mic)
     await mic.restartTrack({
@@ -170,6 +184,36 @@ export async function applyDevices(
       noiseSuppression: true,
       autoGainControl: true,
     });
+}
+// Serialize changes while the model or an image is loading. Each queued change reads the latest
+// preferences so a slow earlier selection cannot replace the user's newest choice.
+const pendingEffects = new WeakMap<LocalVideoTrack, Promise<void>>();
+export function applyCameraEffect(camera: LocalVideoTrack): Promise<void> {
+  const pending = (pendingEffects.get(camera) ?? Promise.resolve())
+    .catch(() => {})
+    .then(async () => {
+      const p = usePreferences.getState();
+      const background =
+        p.localBackground?.url ||
+        (p.backgroundId ? `/api/backgrounds/${encodeURIComponent(p.backgroundId)}` : undefined);
+      if (p.effect === "none" || (p.effect === "image" && !background)) {
+        if (camera.getProcessor()) await camera.stopProcessor();
+        return;
+      }
+      const { BackgroundProcessor, BackgroundProcessorWrapper, supportsBackgroundProcessors } =
+        await import("@livekit/track-processors");
+      if (!supportsBackgroundProcessors())
+        throw new Error("Camera effects are unavailable in this browser.");
+      const options =
+        p.effect === "blur"
+          ? { mode: "background-blur" as const, blurRadius: p.blurRadius }
+          : { mode: "virtual-background" as const, imagePath: background! };
+      const processor = camera.getProcessor();
+      if (processor instanceof BackgroundProcessorWrapper) await processor.switchTo(options);
+      else await camera.setProcessor(BackgroundProcessor(options));
+    });
+  pendingEffects.set(camera, pending);
+  return pending;
 }
 export function useRoomUpdates(room: Room | null) {
   const [revision, setRevision] = useState(0);

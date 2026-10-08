@@ -592,6 +592,19 @@ svg {
 .settings-content > label {
   margin: 14px 0;
 }
+.settings-content input[type="range"] {
+  width: 100%;
+  accent-color: var(--blue);
+}
+.blur-label,
+.blur-scale {
+  display: flex;
+  justify-content: space-between;
+}
+.blur-scale {
+  color: var(--muted);
+  font-size: 11px;
+}
 .settings-content .dialog-actions {
   margin-top: 20px;
 }

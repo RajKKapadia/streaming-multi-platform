@@ -11,6 +11,7 @@ type Preferences = {
   resolution: "1080" | "720" | "480";
   fps: 30 | 60;
   effect: "none" | "blur" | "image";
+  blurRadius: number;
   backgroundId: string;
   localBackground: { url: string; name: string } | null;
   set: (value: Partial<Omit<Preferences, "set">>) => void;
@@ -32,6 +33,7 @@ export const usePreferences = create<Preferences>()(
       resolution: "1080",
       fps: 60,
       effect: "none",
+      blurRadius: 12,
       backgroundId: "",
       localBackground: null,
       set: (value) => set(value),
