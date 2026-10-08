@@ -1,4 +1,4 @@
 {
   "extends": "../tsconfig.json",
-  "include": ["background-browser.ts"]
+  "include": ["background-browser.ts", "stream-quality-browser.ts"]
 }

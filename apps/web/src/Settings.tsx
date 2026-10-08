@@ -5,6 +5,7 @@ import { VideoTrack } from "@studio/rendering";
 import { usePreferences } from "./store";
 import { applyDevices, type Capture } from "./devices";
 import type { Asset } from "@studio/contracts";
+import { usePublishedVideo } from "./stream-quality";
 export function Settings({
   open,
   onClose,
@@ -30,6 +31,7 @@ export function Settings({
   const backgroundLoader = useRef(loadBackgrounds);
   backgroundLoader.current = loadBackgrounds;
   const settings = capture.camera?.mediaStreamTrack.getSettings();
+  const published = usePublishedVideo(capture.camera, open && tab === "camera");
   const refreshBackgrounds = useCallback(async () => {
     const request = ++backgroundRequest.current;
     setLoadingBackgrounds(true);
@@ -190,6 +192,16 @@ export function Settings({
                   ? `${settings.width} × ${settings.height} · ${Math.round(settings.frameRate ?? 0)} fps`
                   : "Enable your camera to inspect its actual settings."}
               </p>
+              {published && (
+                <p className="hint">
+                  Sending camera: {published.frameWidth} × {published.frameHeight} ·{" "}
+                  {Math.round(published.framesPerSecond ?? 0)} fps
+                  {published.qualityLimitationReason === "cpu" &&
+                    ". Your computer is limiting camera quality. Try 30 fps or turn off camera effects."}
+                  {published.qualityLimitationReason === "bandwidth" &&
+                    ". Your upload connection is limiting camera quality. Try 30 fps or a more stable connection."}
+                </p>
+              )}
             </>
           )}
           {tab === "audio" && (

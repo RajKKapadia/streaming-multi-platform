@@ -354,7 +354,7 @@ export const defaultDestinationURLs: Record<Platform, string> = {
 export function defaultPlatformEncoding(platform: Platform): Encoding {
   return platform === "x"
     ? { width: 1280, height: 720, fps: 60, bitrate: 9000, keyframeInterval: 3 }
-    : { ...defaultEncoding, keyframeInterval: 2 };
+    : { ...defaultEncoding, bitrate: platform === "youtube" ? 17000 : 6000, keyframeInterval: 2 };
 }
 export const destinationSchema = z.object({
   platform: z.enum(platformIds),

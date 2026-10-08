@@ -283,7 +283,7 @@ describe("broadcast management", () => {
       destinations.map((d) => ({ url: d.url, key: d.key })),
     );
   });
-  test("720p60 X stays separate from 1080p60 outputs and reports its actual dimensions", async () => {
+  test("platform defaults start three independent encodes with their actual quality", async () => {
     const f = fixture();
     await f.service.updateDestinations(
       "personal",
@@ -293,14 +293,15 @@ describe("broadcast management", () => {
       })),
     );
     const status = await f.service.start("personal");
-    expect(f.gateway.starts).toBe(2);
+    expect(f.gateway.starts).toBe(3);
     const x = status.groups.find((g) => g.destinations.some((d) => d.platform === "x"))!;
     expect(x.encoding).toEqual(defaultPlatformEncoding("x"));
     expect(x.destinations).toHaveLength(1);
-    const other = status.groups.find((g) => g !== x)!;
-    expect(other.encoding.height).toBe(1080);
-    expect(other.encoding.fps).toBe(60);
-    expect(other.destinations).toHaveLength(2);
+    for (const platform of ["youtube", "twitch"] as const) {
+      const group = status.groups.find((g) => g.destinations.some((d) => d.platform === platform))!;
+      expect(group.encoding).toEqual(defaultPlatformEncoding(platform));
+      expect(group.destinations).toHaveLength(1);
+    }
   });
   test("X rejects unsupported 1080p60, excessive bitrates, and mismatched dimensions", async () => {
     const f = fixture();

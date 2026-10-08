@@ -15,7 +15,7 @@ test("the Egress adapter explicitly requests 1080p60, H264 Main and AAC", () => 
   expect(e.audioFrequency).toBe(48000);
   expect(e.keyFrameInterval).toBe(2);
 });
-test("X defaults to its own 720p60 encoding and three-second keyframes", () => {
+test("platform defaults keep YouTube quality separate from Twitch and X", () => {
   const x = createEncodingOptions(defaultPlatformEncoding("x"));
   expect(x.width).toBe(1280);
   expect(x.height).toBe(720);
@@ -26,6 +26,7 @@ test("X defaults to its own 720p60 encoding and three-second keyframes", () => {
     const e = createEncodingOptions(defaultPlatformEncoding(platform));
     expect(e.framerate).toBe(60);
     expect(e.keyFrameInterval).toBe(2);
+    expect(e.videoBitrate).toBe(platform === "youtube" ? 17000 : 6000);
   }
 });
 test("participant grants cannot change room metadata or publish control data", async () => {

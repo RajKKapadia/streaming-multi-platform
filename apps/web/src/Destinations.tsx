@@ -229,6 +229,24 @@ export function Destinations({
             <Radio size={16} />
             <span>H.264 Main · AAC 128 kbps · 48 kHz · {selected === "x" ? 3 : 2}s keyframes</span>
           </div>
+          {selected === "youtube" && (
+            <div>
+              <p className="hint">
+                YouTube recompresses live video. Its recommended H.264 bitrate for 1080p60 is 17,000
+                kbps; lower bitrates can lose camera detail. Twitch uses 6,000 kbps.
+              </p>
+              {current.encoding.bitrate !== defaultPlatformEncoding("youtube").bitrate && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={!!status?.live}
+                  onClick={() => change({ encoding: defaultPlatformEncoding("youtube") })}
+                >
+                  Use recommended YouTube quality
+                </Button>
+              )}
+            </div>
+          )}
           {selected !== "twitch" && (
             <p className="platform-note">
               {selected === "x"
@@ -243,7 +261,7 @@ export function Destinations({
                 <p className={`output-status ${d.status}`} key={`${g.id}-${i}`}>
                   <span className="tiny-dot" />
                   {d.status === "active" ? "Sending video" : d.status} · {g.encoding.height}p
-                  {g.encoding.fps}
+                  {g.encoding.fps} · {g.encoding.bitrate.toLocaleString()} kbps
                   {d.error && <span>{d.error}</span>}
                 </p>
               )),

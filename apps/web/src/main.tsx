@@ -17,6 +17,7 @@ import { useCapture } from "./devices";
 import { api, studioPath } from "./api";
 import { Prejoin } from "./Prejoin";
 import { Studio } from "./Studio";
+import { studioPublishDefaults } from "./stream-quality";
 const Broadcast = lazy(() =>
   import("./Broadcast").then((module) => ({ default: module.Broadcast })),
 );
@@ -64,12 +65,7 @@ function App() {
           frameRate: p.fps,
         },
       },
-      publishDefaults: {
-        videoCodec: "vp8",
-        videoEncoding: { maxBitrate: 6000000, maxFramerate: 60 },
-        screenShareEncoding: { maxBitrate: 6000000, maxFramerate: 60 },
-        simulcast: true,
-      },
+      publishDefaults: studioPublishDefaults,
     });
     try {
       await instance.connect(data.url, data.token);
