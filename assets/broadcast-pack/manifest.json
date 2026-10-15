@@ -1,5 +1,11 @@
 {
   "background_canva_media_id": "MAHW9i45KMc",
+  "license": "LicenseRef-Individual-Noncommercial-1.0",
+  "license_documents": [
+    "LICENSE",
+    "MEDIA_LICENSE.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
   "assets": [
     {
       "file": "media/clips/starting-soon-1-minute.mp4",

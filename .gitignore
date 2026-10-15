@@ -9,6 +9,6 @@ media/**/*
 !media/**/.gitkeep
 test-results/
 
-# Custom files
-docs/broadcast-studio-x-article.zip
-docs/x-article
+# Local X article drafts and publication bundle
+/docs/broadcast-studio-x-article.zip
+/docs/x-article/

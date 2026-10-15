@@ -8,6 +8,8 @@ The screenshots show the actual app's built-in interface preview, with sample pa
 
 The walkthrough covers setup, eight-layout selection, featured cameras, guest staging, presentation layouts, media/background controls, studio messages, camera settings, virtual background options, and YouTube/Twitch/X output configuration.
 
+The project-authored screenshots and animation are available for individual, personal, noncommercial use under [LICENSE](../../LICENSE). See [MEDIA_LICENSE.md](../../MEDIA_LICENSE.md) for attribution and third-party exceptions. Credit **Broadcast Studio — RajKKapadia**, link to the project, state the license, and identify changes when publishing or sharing them; a description or credits page is sufficient.
+
 Regenerate from the saved screenshots with Python 3, Pillow and FFmpeg:
 
 ```sh

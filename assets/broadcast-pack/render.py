@@ -17,7 +17,7 @@ W, H = 1920, 1080
 FPS = 30
 SANS = Path('/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf')
 REGULAR = Path('/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf')
-MONO = Path('/home/logan/.local/share/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFontMono-Bold.ttf')
+MONO = Path.home() / '.local/share/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFontMono-Bold.ttf'
 if not MONO.exists():
     MONO = Path('/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf')
 CYAN = (79, 210, 255)
@@ -251,5 +251,10 @@ def ctas():
 
 if __name__ == '__main__':
     outputs = [countdown(), *celebrations(), *ctas()]
-    (HERE / 'manifest.json').write_text(json.dumps({'background_canva_media_id': 'MAHW9i45KMc', 'assets': outputs}, indent=2) + '\n')
+    (HERE / 'manifest.json').write_text(json.dumps({
+        'background_canva_media_id': 'MAHW9i45KMc',
+        'license': 'LicenseRef-Individual-Noncommercial-1.0',
+        'license_documents': ['LICENSE', 'MEDIA_LICENSE.md', 'THIRD_PARTY_NOTICES.md'],
+        'assets': outputs,
+    }, indent=2) + '\n')
     print('Broadcast pack finished.', flush=True)

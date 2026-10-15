@@ -1,0 +1,73 @@
+Individual Noncommercial License 1.0
+
+Copyright (c) 2026 RajKKapadia
+
+1. Scope
+
+This license applies to the original code, documentation, and other material in
+this repository for which RajKKapadia (the Licensor) can grant permission (the
+Material), unless a file or accompanying notice specifies different terms.
+Project media is also subject to MEDIA_LICENSE.md. Third-party material, public
+domain material, and rights the Licensor does not control are excluded from this
+license and retain their own terms or legal status.
+
+2. Permission for individuals
+
+Subject to these conditions, the Licensor grants each individual person acting
+on their own behalf a worldwide, royalty-free, non-exclusive license to use,
+run, copy, study, modify, and redistribute the Material, including modified
+versions, solely for personal, noncommercial purposes. Examples include private
+experimentation, self-study, unpaid personal projects, and free personal
+livestreams that are not monetized, sponsored, or promotional.
+
+3. Noncommercial and individual-only limits
+
+Noncommercial means not directed toward commercial advantage or monetary
+compensation. Commercial use includes selling copies or access, paid hosting
+or services, paid client or consulting work, paid courses, advertising or
+affiliate promotion, and streams or videos monetized through ads, sponsorships,
+paid subscriptions, tips, donations, or other payments connected to that use.
+
+Use for, on behalf of, or as part of the activities of an employer, client,
+company, nonprofit, educational institution, government, or other organization
+is not permitted under this license, even if the activity is unpaid. A person
+running a business is not exempt from these limits. Paying ordinary costs to
+operate a permitted personal project, such as hosting or connectivity charges,
+does not by itself make that project commercial.
+
+Commercial or organizational use requires a separate written agreement with
+the Licensor. Contact: https://github.com/RajKKapadia
+
+4. Redistribution and attribution
+
+Keep this license, the copyright notice, applicable media terms, and any
+third-party notices with copies or substantial portions of the Material.
+Clearly identify modifications. You may redistribute the Material only under
+these terms; recipients receive permission directly from the Licensor and
+must independently satisfy the individual and noncommercial requirements.
+Do not claim authorship of the original Material or imply endorsement.
+
+This license does not grant rights in names, logos, or trademarks. It does not
+change the licenses of third-party dependencies or content, restrict rights
+provided by law, or assert ownership over your own original broadcasts,
+recordings, contributions, or other output. Copies of project media included
+in your output remain subject to MEDIA_LICENSE.md, and commercial operation
+of the Material still requires separate permission.
+
+5. Termination
+
+Permission under this license terminates automatically if you violate its
+conditions. Other permissions or rights you have independently of this
+license are unaffected.
+
+6. Disclaimer
+
+THE MATERIAL IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NONINFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE LICENSOR IS NOT
+LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE MATERIAL
+OR ITS USE.
+
+This is a custom source-available license, identified as
+LicenseRef-Individual-Noncommercial-1.0. It is not an OSI-approved open-source
+license.

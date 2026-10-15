@@ -21,3 +21,11 @@ The countdown background was generated with the connected Canva image tool. The 
 Run `python3 assets/broadcast-pack/render.py` from the repository root to regenerate the pack. Requires Pillow, FFmpeg with libx264, Noto Sans, and JetBrains Mono or DejaVu Sans Mono. The renderer writes the five named media files and preview images. `manifest.json` records formats and timing.
 
 The root repository excludes media files from Git; keep the generated files or regenerate them from the source background and renderer.
+
+## License and attribution
+
+The project-authored portions of this pack are available for individual, personal, noncommercial use under the [Individual Noncommercial License 1.0](../../LICENSE). Read [MEDIA_LICENSE.md](../../MEDIA_LICENSE.md) for the covered files, attribution, AI-generated background provenance, and third-party exceptions. Monetized or sponsored streams, paid client work, and organizational use require separate written permission.
+
+Credit **Broadcast Studio — RajKKapadia** and link to the [project repository](https://github.com/RajKKapadia/streaming-multi-platform) in accompanying descriptions or credits when publishing these assets or adaptations. State the license and identify changes; no on-screen watermark is required. Keep the license documents with redistributed copies.
+
+`broadcast-assets.zip` includes the license documents at its root. Canva-generated content, fonts, platform trademarks, and other third-party rights are subject to the exceptions in those documents; the project does not grant rights it does not control.

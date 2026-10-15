@@ -1,6 +1,7 @@
 {
   "name": "streaming-multi-platform",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "packageManager": "bun@1.4.2",
   "workspaces": [

@@ -2,7 +2,7 @@
 
 ## Project and scope
 
-Project root: `/home/logan/Desktop/My-Projects/streaming-multi-platform`.
+Run workspace commands from the repository root. This document records the original V1 plan; see the README and shared contracts for the current output profiles.
 
 The starting directory contains `package.json` with Turbo installed and `bun.lock`. There are no applications, workspace definitions, Turbo tasks, or existing application code to migrate.
 

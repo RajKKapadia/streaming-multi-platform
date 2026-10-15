@@ -2,6 +2,12 @@
 
 A personal browser studio for one host and three guests, built with Bun, Turborepo, React/Vite, Express, and LiveKit Cloud. It includes eight layouts, screen sharing, folder media, camera effects, and manual YouTube/Twitch/X RTMP destinations. No database is required.
 
+## License
+
+Available to individual people for personal, noncommercial use under the [Individual Noncommercial License 1.0](LICENSE). Commercial use, monetized or sponsored streams, paid client work, and use on behalf of an organization require separate written permission from [RajKKapadia](https://github.com/RajKKapadia). This is a custom source-available license, not an OSI-approved open-source license.
+
+Included artwork and demo media have [separate scope, attribution, and provenance details](MEDIA_LICENSE.md). [Third-party components](THIRD_PARTY_NOTICES.md) retain their own licenses. Personal files placed in `media/` and the local X article drafts are excluded from Git; the generated media ZIP under `assets/broadcast-pack/` is included.
+
 ## Run locally
 
 Use Bun 1.4.2 or newer.
