@@ -10,6 +10,9 @@ Included artwork and demo media have [separate scope, attribution, and provenanc
 
 ## Run locally
 
+For the workstation-hosted LiveKit/Redis/Egress stack, see
+[Local LiveKit setup](docs/LOCAL_LIVEKIT.md).
+
 Use Bun 1.4.2 or newer.
 
 ```sh

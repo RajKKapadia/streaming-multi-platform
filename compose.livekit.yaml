@@ -1,0 +1,60 @@
+name: broadcast-studio-livekit
+
+x-service: &service
+  network_mode: host
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  redis:
+    <<: *service
+    image: redis:7.4.6-alpine
+    command:
+      - redis-server
+      - --bind
+      - 127.0.0.1
+      - --port
+      - "6389"
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-h", "127.0.0.1", "-p", "6389", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  livekit:
+    <<: *service
+    image: livekit/livekit-server:v1.13.10
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./.local/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  egress:
+    <<: *service
+    image: livekit/egress:v1.15.0
+    environment:
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Run scripts/prepare-local-livekit.py and pass --env-file .local/livekit/app.env}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Run scripts/prepare-local-livekit.py and pass --env-file .local/livekit/app.env}
+      EGRESS_CONFIG_FILE: /etc/egress.yaml
+    volumes:
+      - ./.local/livekit/egress.yaml:/etc/egress.yaml:ro
+    cap_add:
+      - SYS_ADMIN
+    shm_size: 1gb
+    cpus: 16
+    mem_limit: 20g
+    depends_on:
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started

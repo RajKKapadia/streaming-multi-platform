@@ -417,10 +417,20 @@ export function ProgramCanvas({
       screens.push(rect(featured ? 600 : 48, 90, featured ? 1272 : 1824, 900));
       if (featured) tiles.push({ source: featured, style: rect(48, 180, 528, 720) });
       break;
-    case "screen-rail":
+    case "screen-rail": {
+      const cameraHeight = 226,
+        cameraGap = 24,
+        railHeight = staged.length * cameraHeight + Math.max(0, staged.length - 1) * cameraGap,
+        railTop = (1080 - railHeight) / 2;
       screens.push(rect(staged.length ? 402 : 48, 48, staged.length ? 1470 : 1824, 984));
-      staged.forEach((s, i) => tiles.push({ source: s, style: rect(48, 48 + i * 250, 330, 226) }));
+      staged.forEach((s, i) =>
+        tiles.push({
+          source: s,
+          style: rect(48, railTop + i * (cameraHeight + cameraGap), 330, cameraHeight),
+        }),
+      );
       break;
+    }
     case "pip":
       screens.push(rect(0, 0, 1920, 1080));
       if (featured) tiles.push({ source: featured, style: rect(1548, 48, 324, 276) });
