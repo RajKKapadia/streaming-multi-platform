@@ -8,6 +8,7 @@ export const layoutIds = [
   "screen-presenter",
   "screen-rail",
   "pip",
+  "pip-transparent",
   "screen-only",
 ] as const;
 export type LayoutId = (typeof layoutIds)[number];
@@ -19,6 +20,7 @@ export const layouts: { id: LayoutId; name: string; screen: boolean }[] = [
   { id: "screen-presenter", name: "Screen + presenter", screen: true },
   { id: "screen-rail", name: "Screen + cameras", screen: true },
   { id: "pip", name: "Picture in picture", screen: true },
+  { id: "pip-transparent", name: "Screen + cutout", screen: true },
   { id: "screen-only", name: "Screen only", screen: true },
 ];
 export const categories = ["logos", "overlays", "clips", "backgrounds", "music", "sounds"] as const;
@@ -219,7 +221,7 @@ export function applyCommand(state: StudioState, command: Command, now: number):
       s.screen = command.screen;
       if (s.screen && !layouts.find((l) => l.id === s.layout)?.screen)
         s.layout = "screen-presenter";
-      if (!s.screen && (s.layout.startsWith("screen") || s.layout === "pip")) s.layout = "grid";
+      if (!s.screen && layouts.find((l) => l.id === s.layout)?.screen) s.layout = "grid";
       break;
     case "background":
       s.background = command.background;

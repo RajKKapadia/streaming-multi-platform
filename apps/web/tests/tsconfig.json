@@ -1,4 +1,10 @@
 {
   "extends": "../tsconfig.json",
-  "include": ["background-browser.ts", "stream-quality-browser.ts"]
+  "include": [
+    "../src/vite-env.d.ts",
+    "background-browser.ts",
+    "stream-quality-browser.ts",
+    "voice-browser.tsx",
+    "voice.test.ts"
+  ]
 }

@@ -31,7 +31,7 @@ test("backstage voices are excluded, and invisible staged cameras retain audio",
   expect(programVoices({ ...state, clip }, sources)).toEqual([]);
   expect(sources[0]!.microphone?.sid).toBe("mic-0");
 });
-test("all eight layouts render with four camera-off humans and a selected screen", () => {
+test("all layouts render with four camera-off humans and a selected screen", () => {
   const state: StudioState = {
     ...initialState(),
     participants: sources.map((s) => s.identity),

@@ -9,6 +9,7 @@ import {
   type Room,
 } from "livekit-client";
 import { usePreferences } from "./store";
+import { applyMicrophoneEffect, microphoneOptions, voiceErrors } from "./voice";
 export function useCapture() {
   const [tracks, setTracks] = useState<LocalTrack[]>([]),
     [devices, setDevices] = useState<MediaDeviceInfo[]>([]),
@@ -19,6 +20,21 @@ export function useCapture() {
   const enabling = useRef(false);
   const preferences = usePreferences();
   const camera = tracks.find((t): t is LocalVideoTrack => t instanceof LocalVideoTrack);
+  const microphone = tracks.find((t): t is LocalAudioTrack => t instanceof LocalAudioTrack);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: The queued update reads the latest voice preferences.
+  useEffect(() => {
+    if (!microphone) return;
+    const apply = () =>
+      void applyMicrophoneEffect(microphone).catch((error) => setError(String(error)));
+    const restarted = () => {
+      if (!voiceErrors.has(microphone)) apply();
+    };
+    apply();
+    microphone.on(TrackEvent.Restarted, restarted);
+    return () => {
+      microphone.off(TrackEvent.Restarted, restarted);
+    };
+  }, [microphone, preferences.voice]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: The processor reads the latest preferences when its queued update starts.
   useEffect(() => {
     setEffectError("");
@@ -72,12 +88,7 @@ export function useCapture() {
       const ts =
         audio || video
           ? await createLocalTracks({
-              audio: audio && {
-                deviceId: p.microphoneId || undefined,
-                echoCancellation: p.echo,
-                noiseSuppression: true,
-                autoGainControl: true,
-              },
+              audio: audio && microphoneOptions(),
               video: video && {
                 deviceId: p.cameraId || undefined,
                 resolution: {
@@ -88,6 +99,8 @@ export function useCapture() {
               },
             })
           : [];
+      for (const track of ts)
+        if (track instanceof LocalAudioTrack) await applyMicrophoneEffect(track);
       tracks.filter((t) => !retained.includes(t)).forEach((t) => t.stop());
       setTracks([...retained, ...ts]);
       await refresh();
@@ -115,7 +128,7 @@ export function useCapture() {
     enable,
     refresh,
     camera,
-    microphone: tracks.find((t): t is LocalAudioTrack => t instanceof LocalAudioTrack),
+    microphone,
   };
 }
 export type Capture = ReturnType<typeof useCapture>;
@@ -137,6 +150,7 @@ export function useMicrophoneLevel(microphone?: LocalAudioTrack) {
     };
     bind();
     microphone.on(TrackEvent.Restarted, bind);
+    microphone.on(TrackEvent.TrackProcessorUpdate, bind);
     const resume = () => {
       void context.resume().catch(() => {});
     };
@@ -153,6 +167,7 @@ export function useMicrophoneLevel(microphone?: LocalAudioTrack) {
       clearInterval(timer);
       window.removeEventListener("pointerdown", resume);
       microphone.off(TrackEvent.Restarted, bind);
+      microphone.off(TrackEvent.TrackProcessorUpdate, bind);
       source?.disconnect();
       void context.close();
     };
@@ -178,13 +193,10 @@ export async function applyDevices(
     });
     await applyCameraEffect(camera);
   }
-  if (mic)
-    await mic.restartTrack({
-      deviceId: p.microphoneId || undefined,
-      echoCancellation: p.echo,
-      noiseSuppression: true,
-      autoGainControl: true,
-    });
+  if (mic) {
+    await mic.restartTrack(microphoneOptions());
+    await applyMicrophoneEffect(mic);
+  }
 }
 // Serialize changes while the model or an image is loading. Each queued change reads the latest
 // preferences so a slow earlier selection cannot replace the user's newest choice.

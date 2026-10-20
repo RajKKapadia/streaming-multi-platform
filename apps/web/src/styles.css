@@ -577,7 +577,19 @@ svg {
 }
 .settings-content {
   padding: 20px;
+  min-width: 0;
+  max-height: min(75dvh, 850px);
+  overflow-y: auto;
 }
+.voice-settings { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 18px; }
+.voice-settings > label, .voice-range, .voice-sample { display: block; margin: 16px 0; }
+.voice-range > span { display: flex; justify-content: space-between; gap: 12px; }
+.voice-range output { color: var(--muted); white-space: nowrap; }
+.voice-settings details { margin: 16px 0; }
+.voice-settings summary { cursor: pointer; font-weight: 600; }
+.voice-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 15px 0; font-size: 11px; }
+.voice-meters span { display: flex; flex-direction: column; gap: 4px; background: #f0f4fa; border-radius: 5px; padding: 10px; }
+.voice-sample audio { display: block; width: 100%; margin-top: 8px; }
 .settings-preview {
   aspect-ratio: 16 / 9;
   background: #edf1f8;

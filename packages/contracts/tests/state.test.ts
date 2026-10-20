@@ -6,8 +6,31 @@ import {
   settleState,
   nextPlaybackEnd,
   type Command,
+  layouts,
+  commandSchema,
+  stateSchema,
 } from "../src";
 describe("program transitions", () => {
+  test("screen layouts require a share, survive share replacement, and reset when it ends", () => {
+    for (const layout of layouts.filter((l) => l.screen)) {
+      const command = commandSchema.parse({ type: "layout", layout: layout.id });
+      expect(() => applyCommand(initialState(), command, 0)).toThrow("screen");
+      let state = applyCommand(
+        initialState(),
+        { type: "screen", screen: { identity: "host", sid: "first" } },
+        0,
+      );
+      state = applyCommand(state, command, 0);
+      expect(stateSchema.parse(state).layout).toBe(layout.id);
+      state = applyCommand(
+        state,
+        { type: "screen", screen: { identity: "guest-1", sid: "replacement" } },
+        0,
+      );
+      expect(state.layout).toBe(layout.id);
+      expect(applyCommand(state, { type: "screen", screen: null }, 0).layout).toBe("grid");
+    }
+  });
   test("only playing, finite media schedules a program redraw, including music resumed after a clip", () => {
     let s = initialState();
     expect(nextPlaybackEnd(s)).toBeNull();

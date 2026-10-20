@@ -29,6 +29,7 @@
       "dependencies": {
         "@livekit/egress-sdk": "latest",
         "@livekit/track-processors": "latest",
+        "@sapphi-red/web-noise-suppressor": "0.4.1",
         "@studio/contracts": "workspace:*",
         "@studio/rendering": "workspace:*",
         "@studio/ui": "workspace:*",
@@ -57,6 +58,7 @@
     "packages/studio": {
       "name": "@studio/rendering",
       "dependencies": {
+        "@mediapipe/tasks-vision": "0.10.14",
         "@studio/contracts": "workspace:*",
         "livekit-client": "latest",
         "react": "latest",
@@ -213,6 +215,8 @@
     "@rolldown/binding-win32-x64-msvc": ["@rolldown/binding-win32-x64-msvc@1.2.12", "", { "os": "win32", "cpu": "x64" }, "sha512-WIw2haVKwjuYdXkHaoC0mF8Le71TuCBxjrdKqLbJGctbBABj+ClfmNvtbOnzpq3RokNo5+V1qhtSzJyXorsklQ=="],
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.1", "", {}, "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="],
+
+    "@sapphi-red/web-noise-suppressor": ["@sapphi-red/web-noise-suppressor@0.4.1", "", {}, "sha512-hy2GnF079+zi4n9BZUf+GGIQ1IofApAk6rgGMyMQ3soHfz/GKu1pcCsmePyIHVvUuv1LrFudw9BmmBqoOKay5w=="],
 
     "@studio/api": ["@studio/api@workspace:apps/api"],
 

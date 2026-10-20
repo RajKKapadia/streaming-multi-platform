@@ -1,0 +1,13 @@
+Production-built generated-audio verification. No physical microphone or streaming destination used.
+
+PASS actual AudioWorklet output: -17.2 dBFS RMS
+PASS live parameter changes and peak protection without restarting microphone capture
+PASS processed microphone mute/unmute
+PASS processed microphone carried over WebRTC: received -6.0 dBFS RMS
+PASS bypass swaps the published sender to the original track and releases processing resources
+PASS SDK processor restart with a replacement source and omitted audioContext
+PASS RNNoise WASM noise reduction over WebRTC: 20.9 dB
+PASS processor failure restores the raw sender track with a visible diagnostic
+PASS missing worklet assets retain the working raw microphone path
+PASS leaving while voice processing initializes releases its graph
+PASS controls ready for before/after sample recording; ALL AUDIO CHECKS PASSED

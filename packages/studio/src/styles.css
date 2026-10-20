@@ -15,13 +15,38 @@
   border-radius: inherit;
   pointer-events: none;
   z-index: 1;
-  box-shadow: inset 0 0 0 5px #63e6be, inset 0 0 28px 8px #63e6be70;
+  box-shadow:
+    inset 0 0 0 5px #63e6be,
+    inset 0 0 28px 8px #63e6be70;
   opacity: 0;
   transition: opacity 400ms ease-out;
 }
 .program-camera[data-speaking="true"]::after {
   opacity: 1;
   transition-duration: 120ms;
+}
+.program-camera[data-transparent="true"],
+.program-avatar[data-transparent="true"] {
+  background: transparent;
+  border-radius: 0;
+}
+.program-camera[data-transparent="true"]::after {
+  display: none;
+}
+.program-foreground,
+.program-foreground canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.program-foreground-status {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 8px;
+  color: white;
+  background: #080b12cc;
+  font: 18px / 1.3 system-ui;
 }
 @media (prefers-reduced-motion: reduce) {
   .program-camera::after {

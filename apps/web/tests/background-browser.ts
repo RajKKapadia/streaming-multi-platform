@@ -4,6 +4,7 @@ import { BackgroundMaskFilter } from "../src/background-mask";
 import { stableBackgroundProcessor, type CameraForegroundMode } from "../src/background-processor";
 import { applyCameraEffect } from "../src/devices";
 import { usePreferences } from "../src/store";
+import { foregroundChecks } from "./foreground-browser";
 
 const results = document.querySelector<HTMLPreElement>("#results")!;
 const button = document.querySelector<HTMLButtonElement>("#run")!;
@@ -320,6 +321,7 @@ button.addEventListener("click", async () => {
   results.textContent = "Running GPU checks…\n";
   try {
     maskChecks();
+    await foregroundChecks(report);
     await processorChecks();
     report("Checking canvas capture fallback…");
     await processorChecks(true);

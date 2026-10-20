@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Room, Track, LocalVideoTrack, LocalAudioTrack } from "livekit-client";
+import { Room, Track, LocalVideoTrack, LocalAudioTrack, createLocalAudioTrack } from "livekit-client";
+import { microphoneOptions, applyMicrophoneEffect } from "./voice";
 import {
   Radio,
   Plus,
@@ -116,6 +117,14 @@ export function LayoutGlyph({ id }: { id: LayoutId }) {
           <rect className="glyph-screen" x="5" y="5" width="42" height="24" rx="1" />
           <g className="glyph-inset">
             <GlyphPerson x={40} y={10} size={0.5} />
+          </g>
+        </>
+      )}
+      {id === "pip-transparent" && (
+        <>
+          <rect className="glyph-screen" x="5" y="5" width="42" height="24" rx="1" />
+          <g className="glyph-inset">
+            <GlyphPerson x={40} y={25} size={0.5} />
           </g>
         </>
       )}
@@ -334,7 +343,23 @@ export function Studio({
         } else await capture.enable(type === "mic" ? "microphone" : "camera");
         return;
       }
-      if (type === "mic") await room.localParticipant.setMicrophoneEnabled(!mic || mic.isMuted);
+      if (type === "mic") {
+        if (mic?.track) {
+          if (mic.isMuted) await mic.track.unmute();
+          else await mic.track.mute();
+        } else {
+          const track = await createLocalAudioTrack(microphoneOptions());
+          try {
+            await applyMicrophoneEffect(track);
+            await room.localParticipant.publishTrack(track);
+            capture.tracks.filter(t => t instanceof LocalAudioTrack && t !== track).forEach(t => t.stop());
+            capture.setTracks([...capture.tracks.filter(t => !(t instanceof LocalAudioTrack)), track]);
+          } catch (error) {
+            track.stop();
+            throw error;
+          }
+        }
+      }
       if (type === "camera") await room.localParticipant.setCameraEnabled(!cam || cam.isMuted);
       if (type === "screen") {
         const publication = await room.localParticipant.setScreenShareEnabled(!sharing, {

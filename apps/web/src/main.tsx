@@ -9,7 +9,7 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
-import { Room } from "livekit-client";
+import { Room, LocalAudioTrack } from "livekit-client";
 import type { JoinResponse } from "@studio/contracts";
 import { Button } from "@studio/ui";
 import { usePreferences } from "./store";
@@ -18,6 +18,7 @@ import { api, studioPath } from "./api";
 import { Prejoin } from "./Prejoin";
 import { Studio } from "./Studio";
 import { studioPublishDefaults } from "./stream-quality";
+import { microphoneOptions, applyMicrophoneEffect } from "./voice";
 const Broadcast = lazy(() =>
   import("./Broadcast").then((module) => ({ default: module.Broadcast })),
 );
@@ -49,12 +50,7 @@ function App() {
     if (room) await room.disconnect(false);
     const p = usePreferences.getState();
     const instance = new Room({
-      audioCaptureDefaults: {
-        deviceId: p.microphoneId || undefined,
-        echoCancellation: p.echo,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
+      audioCaptureDefaults: microphoneOptions(),
       adaptiveStream: true,
       dynacast: true,
       videoCaptureDefaults: {
@@ -74,7 +70,10 @@ function App() {
         (track) => track.isMuted || track.mediaStreamTrack.readyState === "live",
       );
       capture.setTracks(liveTracks);
-      for (const track of liveTracks) await instance.localParticipant.publishTrack(track);
+      for (const track of liveTracks) {
+        if (track instanceof LocalAudioTrack) await applyMicrophoneEffect(track);
+        await instance.localParticipant.publishTrack(track);
+      }
       setJoinData(data);
       setRoom(instance);
       setPreview(false);

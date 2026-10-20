@@ -19,6 +19,9 @@ license texts or a complete inventory of transitive dependencies.
 | Lightning CSS, used by the build tools | MPL-2.0 | [Lightning CSS](https://github.com/parcel-bundler/lightningcss/blob/master/LICENSE) |
 | MediaPipe Tasks Vision | Apache-2.0 | [MediaPipe](https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE) |
 | Optional MediaPipe multiclass selfie segmentation model | Apache-2.0 | [Google model card](https://storage.googleapis.com/mediapipe-assets/Model%20Card%20Multiclass%20Segmentation.pdf) |
+| Web Noise Suppressor audio worklet wrapper | MIT | [web-noise-suppressor](https://github.com/sapphi-red/web-noise-suppressor) |
+| RNNoise WebAssembly adapter | Apache-2.0 | [rnnoise-wasm](https://github.com/shiguredo/rnnoise-wasm) |
+| RNNoise noise suppression model and DSP | BSD-3-Clause | [RNNoise](https://github.com/xiph/rnnoise) |
 
 MediaPipe model files are fetched at runtime and are not committed to this
 repository. LiveKit and other hosted services have their own account and

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Track, type Room, type Participant } from "livekit-client";
 import { SoundPlayback } from "./sound-playback";
+import { ForegroundVideo } from "./ForegroundVideo";
 import {
   playbackPosition,
   settleState,
@@ -112,17 +113,34 @@ export async function startMediaAudio() {
   );
   await Promise.all([...media].filter((el) => !el.muted).map((el) => el.play()));
 }
-function Camera({ source, style }: { source?: Source; style: CSSProperties }) {
+function Camera({
+  source,
+  style,
+  transparent = false,
+}: {
+  source?: Source;
+  style: CSSProperties;
+  transparent?: boolean;
+}) {
   return (
-    <div className="program-camera" data-speaking={source?.isSpeaking || undefined} style={style}>
+    <div
+      className="program-camera"
+      data-transparent={transparent || undefined}
+      data-speaking={source?.isSpeaking || undefined}
+      style={style}
+    >
       {source?.camera && !source.cameraMuted ? (
-        <VideoTrack track={source.camera} />
+        transparent ? (
+          <ForegroundVideo track={source.camera} />
+        ) : (
+          <VideoTrack track={source.camera} />
+        )
       ) : (
-        <div className="program-avatar">
+        <div className="program-avatar" data-transparent={transparent || undefined}>
           <span>{source?.name.slice(0, 1).toUpperCase() || "S"}</span>
         </div>
       )}
-      {source && <div className="program-name">{source.name}</div>}
+      {source && !transparent && <div className="program-name">{source.name}</div>}
     </div>
   );
 }
@@ -364,7 +382,7 @@ export function ProgramCanvas({
         p.identity === state.screen?.identity &&
         (p.screenSid ?? p.screen?.sid) === state.screen?.sid,
     );
-  const tiles: { source?: Source; style: CSSProperties }[] = [],
+  const tiles: { source?: Source; style: CSSProperties; transparent?: boolean }[] = [],
     screens: CSSProperties[] = [];
   const rect = (left: number, top: number, width: number, height: number): CSSProperties => ({
     position: "absolute",
@@ -434,6 +452,11 @@ export function ProgramCanvas({
     case "pip":
       screens.push(rect(0, 0, 1920, 1080));
       if (featured) tiles.push({ source: featured, style: rect(1548, 48, 324, 276) });
+      break;
+    case "pip-transparent":
+      screens.push(rect(0, 0, 1920, 1080));
+      if (featured)
+        tiles.push({ source: featured, style: rect(1548, 756, 324, 276), transparent: true });
       break;
     case "screen-only":
       screens.push(rect(0, 0, 1920, 1080));

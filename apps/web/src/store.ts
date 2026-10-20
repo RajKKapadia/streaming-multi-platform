@@ -2,6 +2,7 @@ import { initialState, type VisualPreset } from "@studio/contracts";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CameraForegroundMode } from "./background-processor";
+import { defaultVoiceSettings, type VoiceSettings } from "./voice-settings";
 type Preferences = {
   visual: VisualPreset;
   name: string;
@@ -9,6 +10,7 @@ type Preferences = {
   microphoneId: string;
   mirror: boolean;
   echo: boolean;
+  voice: VoiceSettings;
   resolution: "1080" | "720" | "480";
   fps: 30 | 60;
   effect: "none" | "blur" | "image";
@@ -32,6 +34,7 @@ export const usePreferences = create<Preferences>()(
       microphoneId: "",
       mirror: true,
       echo: true,
+      voice: { ...defaultVoiceSettings },
       resolution: "1080",
       fps: 60,
       effect: "none",

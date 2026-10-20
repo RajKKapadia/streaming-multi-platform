@@ -9,6 +9,7 @@ media/**/*
 !media/**/.gitkeep
 test-results/
 .local/livekit/
+.local/voice-browser/
 
 # Local X article drafts and publication bundle
 /docs/broadcast-studio-x-article.zip

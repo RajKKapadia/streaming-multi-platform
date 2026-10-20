@@ -6,6 +6,7 @@ import { usePreferences } from "./store";
 import { applyDevices, type Capture } from "./devices";
 import type { Asset } from "@studio/contracts";
 import { usePublishedVideo } from "./stream-quality";
+import { VoiceSettings } from "./VoiceSettings";
 export function Settings({
   open,
   onClose,
@@ -115,7 +116,7 @@ export function Settings({
         if (!v) onClose();
       }}
       title="Settings"
-      description="Choose devices and camera effects."
+      description="Choose devices, voice processing, and camera effects."
       className="settings-dialog"
     >
       <div className="settings-body">
@@ -133,13 +134,15 @@ export function Settings({
           ))}
         </nav>
         <div className="settings-content">
-          <div className="settings-preview">
-            {capture.camera ? (
-              <VideoTrack track={capture.camera} mirror={p.mirror} />
-            ) : (
-              <Camera size={40} />
-            )}
-          </div>
+          {tab !== "audio" && (
+            <div className="settings-preview">
+              {capture.camera ? (
+                <VideoTrack track={capture.camera} mirror={p.mirror} />
+              ) : (
+                <Camera size={40} />
+              )}
+            </div>
+          )}
           {tab === "camera" && (
             <>
               <div className="field-row">
@@ -233,6 +236,7 @@ export function Settings({
               <p className="hint">
                 <Headphones size={15} /> Wear headphones when inviting guests or monitoring effects.
               </p>
+              <VoiceSettings microphone={capture.microphone} />
             </>
           )}
           {tab === "effects" && (

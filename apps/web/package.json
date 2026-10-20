@@ -6,14 +6,16 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "check-types": "tsc --noEmit",
-    "lint": "biome lint src"
+    "lint": "biome lint src",
+    "test": "bun test tests/voice.test.ts"
   },
   "dependencies": {
-    "@studio/contracts": "workspace:*",
-    "@studio/ui": "workspace:*",
-    "@studio/rendering": "workspace:*",
     "@livekit/egress-sdk": "latest",
     "@livekit/track-processors": "latest",
+    "@sapphi-red/web-noise-suppressor": "0.4.1",
+    "@studio/contracts": "workspace:*",
+    "@studio/rendering": "workspace:*",
+    "@studio/ui": "workspace:*",
     "livekit-client": "latest",
     "lucide-react": "latest",
     "react": "latest",

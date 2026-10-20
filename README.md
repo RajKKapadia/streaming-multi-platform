@@ -1,6 +1,6 @@
 # Broadcast Studio
 
-A personal browser studio for one host and three guests, built with Bun, Turborepo, React/Vite, Express, and LiveKit Cloud. It includes eight layouts, screen sharing, folder media, camera effects, and manual YouTube/Twitch/X RTMP destinations. No database is required.
+A personal browser studio for one host and three guests, built with Bun, Turborepo, React/Vite, Express, and LiveKit Cloud. It includes nine layouts, screen sharing, folder media, camera effects, and manual YouTube/Twitch/X RTMP destinations. No database is required.
 
 ## License
 
@@ -86,6 +86,8 @@ In Settings → Visual effects, try blur or a virtual background before entering
 
 Blur and virtual backgrounds use GPU edge stabilization to reduce flicker around stationary hands and objects. Moving edges respond faster to reduce trailing silhouettes. The person segmentation model can still remove microphones and boom arms; check your actual camera preview before broadcasting. The Picture in picture layout uses a narrower top-right camera inset while keeping its height and right margin.
 
+**Screen + cutout** places the presenter at the bottom right over a full-screen share, with the same 324 × 276 size as Picture in picture. It automatically removes the camera background in the studio preview and outgoing renderer, with no camera frame or name badge. Select a screen share before choosing this layout. Background removal requires WebGL 2 and access to the same MediaPipe model/WASM hosts used by camera effects.
+
 To exclude more objects, open Settings → Visual effects, select blur or a virtual background, then set Foreground to **Person only (experimental)**. It uses hair, skin, and clothing categories and excludes background/accessories. Some object fragments may remain. Removing an object that covers your body reveals the background in that area; this mode cannot reconstruct hidden clothing or skin. It may reduce frame rate. **Stable foreground** remains the default, and your foreground choice is saved in this browser.
 
 Use browser-compatible codecs (for example, H.264/AAC in MP4, or VP8/VP9/Opus in WebM). Playback is enabled only after browser probing succeeds; files are not transcoded. Unsupported or damaged files display an error. Images retain transparency. No upload or asset registration workflow is needed. The media endpoint supports byte ranges and rejects escaping symlinks.
@@ -98,6 +100,16 @@ Screen shares appear beside their owner's camera in the People row, with matchin
 
 The host and guests hear each other's room voices, plus music, sounds, and clip audio. Media monitoring starts on for everyone; the headphone button mutes media only for you and does not change the broadcast or anyone else's audio. If playback is blocked, click **Enable audio**. Use headphones while monitoring media. Camera and screen preview videos stay muted, and your own microphone is never played locally. For a virtual background, open Settings → Visual effects during setup or in the studio, choose Virtual background, choose a PNG/JPEG/WebP from your computer or the shared library, and Apply settings. Local images stay selected until the page reloads and are not uploaded. Shared backgrounds from `media/backgrounds` refresh whenever Settings opens. On setup, you can enter your display name and host passcode directly in Visual effects and click **Load backgrounds** to access the library without joining; invited guests load it using their invitation. After adding files while Settings is open, click **Refresh backgrounds** beside the image selector. These images appear only in the virtual-background selector; Media → Stage background offers gradients and solid colors for the program layout.
 
+In **Settings → Audio**, turn on **Live voice processing** or choose **Natural speech** / **Warm broadcast voice**. The microphone is processed in this app before it is published to LiveKit: local RNNoise fan/keyboard noise removal, a gentle expander, low-rumble removal, warmth/mud/clarity EQ, de-essing, soft-knee compression, bounded live loudness leveling, and a final sample-peak limiter. OBS and virtual audio routing are not required. Each host/guest controls their own microphone; music, clips, and screen audio keep their existing sound. Processing starts bypassed for existing setups and preferences are saved in this browser.
+
+Voice controls apply immediately; **Apply settings** applies device and echo-cancellation choices. Open **Voice tone and dynamics** to tune the noise threshold, EQ, compression, loudness target, output trim, and peak ceiling. The warm preset starts with +2 dB at 180 Hz, gentle clarity, 2.5:1 compression at −18 dBFS, a −16 LUFS live target, and a −3 dBFS sample-peak ceiling. Live loudness is a K-weighted rolling estimate with slow gain adjustment (at most +6/−12 dB), held steady during quiet pauses; it is not whole-recording integrated loudness normalization. The limiter protects each microphone before mixing and does not guarantee the combined program's true-peak level. Leave hardware gain below clipping; filtering cannot repair a clipped microphone.
+
+Enable the microphone, then use **Record an 8-second mic comparison** to capture simultaneous before/after samples. Speak normally, pause, and type; listen using headphones. Samples stay in memory in this browser and disappear when Settings closes. Your microphone is never monitored automatically. With enhancement enabled, browser noise suppression and automatic gain are disabled to avoid stacking cleanup/leveling stages; echo cancellation remains separately configurable. Bypass restores browser cleanup. A startup/worklet failure restores the original microphone path and reports a diagnostic in Audio settings. Worklets and RNNoise WASM assets are served by this app; use HTTPS or localhost. Test your actual microphone and A/V sync under streaming load before using a new preset live; loud clicks during speech may remain, and aggressive thresholds/de-essing can damage quiet words or consonants.
+
+For repeatable generated-audio browser checks, run `bun run --cwd apps/web dev` and open `/tests/voice.html` on the Vite origin. This exercises the real audio worklets, RNNoise WASM, local WebRTC sender/receiver, live controls, mute/unmute, source replacement, bypass, and error recovery without microphone permission or a streaming destination. `bun run test` includes the deterministic voice DSP tests.
+
+To verify production asset packaging, run `apps/web/node_modules/.bin/vite build --config apps/web/tests/voice-build.config.ts`, then `apps/web/node_modules/.bin/vite preview --config apps/web/tests/voice-build.config.ts` and open `http://127.0.0.1:5175/tests/voice.html`. The generated verification bundle stays in ignored `.local/voice-browser/` and is separate from the application build.
+
 ## Checks and live acceptance
 
 ```sh
@@ -107,7 +119,7 @@ bun run test
 bun run build
 ```
 
-Tests cover authentication/role restrictions, expiring tokens, media containment, guest reservations across restart, stage/audio policy, eight camera-off layouts, clip restoration, encoding groups, duplicate starts, partial failures, and recovery/stop. The HTTP tests bind a temporary localhost port.
+Tests cover authentication/role restrictions, expiring tokens, media containment, guest reservations across restart, stage/audio policy, nine camera-off layouts, screen-layout termination, clip restoration, encoding groups, duplicate starts, partial failures, and recovery/stop. The HTTP tests bind a temporary localhost port.
 
 Automated checks and the interface preview do **not** prove live delivery. Complete these with actual LiveKit and prepared platform accounts:
 
