@@ -7,6 +7,8 @@ import {
   Output,
   StreamOutput,
   StreamProtocol,
+  SegmentedFileOutput,
+  SegmentedFileProtocol,
   EncodingOptions,
   AudioCodec,
   VideoCodec,
@@ -23,6 +25,7 @@ export interface Gateway {
   participants(name: string): Promise<ParticipantInfo[]>;
   token(name: string, identity: string, displayName: string, role: Role): Promise<string>;
   start(name: string, renderUrl: string, urls: string[], encoding: Encoding): Promise<EgressInfo>;
+  startRecording(name: string, renderUrl: string, directory: string, encoding: Encoding): Promise<EgressInfo>;
   list(name: string): Promise<EgressInfo[]>;
   stop(id: string): Promise<void>;
 }
@@ -115,9 +118,34 @@ export class LiveKitGateway implements Gateway {
   async list(name: string) {
     return this.egress.listEgress({ roomName: name });
   }
+  async startRecording(name: string, renderUrl: string, directory: string, encoding: Encoding) {
+    await verifyRenderer(renderUrl);
+    return this.egress.startEgress(createRecordingRequest(name, renderUrl, directory, encoding));
+  }
   async stop(id: string) {
     await this.egress.stopEgress(id);
   }
+}
+export function createRecordingRequest(name: string, renderUrl: string, directory: string, encoding: Encoding) {
+  return new StartEgressRequest({
+    roomName: name,
+    source: { case: "template", value: new TemplateSource({ customBaseUrl: renderUrl }) },
+    encoding: { case: "advanced", value: createEncodingOptions(encoding) },
+    outputs: [new Output({ config: { case: "segments", value: new SegmentedFileOutput({
+      protocol: SegmentedFileProtocol.HLS,
+      filenamePrefix: `${directory}/segment`,
+      playlistName: `${directory}/recording.m3u8`,
+      segmentDuration: 2,
+      disableManifest: true,
+    }) } })],
+  });
+}
+
+export function streamEgress(job: EgressInfo) {
+  const request = job.request;
+  if (request.case === "egress") return request.value.outputs.some(o => o.config.case === "stream");
+  if (request.case === "roomComposite") return request.value.streamOutputs.length > 0;
+  return job.streamResults.length > 0 || job.result.case === "stream";
 }
 export class RendererUnavailableError extends Error {
   constructor() {

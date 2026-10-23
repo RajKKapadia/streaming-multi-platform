@@ -377,3 +377,29 @@ export type BroadcastStatus = {
   live: boolean;
   serverTime: number;
 };
+
+export const recordingInputSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  folder: z.string().trim().max(200).default(""),
+});
+export type RecordingInput = z.infer<typeof recordingInputSchema>;
+export type Recording = {
+  id: string;
+  name: string;
+  directory: string;
+  status: "starting" | "recording" | "stopping" | "finished" | "interrupted" | "failed";
+  startedAt: number;
+  endedAt?: number;
+  segments: number;
+  savedSeconds: number;
+  savedBytes: number;
+  exportStatus: "none" | "exporting" | "ready" | "failed";
+  exportedSeconds?: number;
+  error?: string;
+  downloadUrl?: string;
+};
+export type RecordingsSnapshot = {
+  enabled: boolean;
+  root: string;
+  recordings: Recording[];
+};

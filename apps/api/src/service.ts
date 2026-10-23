@@ -21,7 +21,7 @@ import {
   type MessagesSnapshot,
 } from "@studio/contracts";
 import { EgressStatus, type EgressInfo } from "livekit-server-sdk";
-import { activeEgress, RendererUnavailableError, type Gateway } from "./livekit";
+import { activeEgress, streamEgress, RendererUnavailableError, type Gateway } from "./livekit";
 import type { Config } from "./config";
 import type { Auth } from "./auth";
 import type { MediaLibrary } from "./media";
@@ -390,7 +390,7 @@ export class StudioService {
     const listed = await this.gateway.list(this.room(studio));
     const merged = new Map((this.managed.get(studio) ?? []).map((e) => [e.egressId, e]));
     for (const e of listed) merged.set(e.egressId, e);
-    const jobs = [...merged.values()];
+    const jobs = [...merged.values()].filter(streamEgress);
     this.managed.set(studio, jobs);
     return jobs;
   }

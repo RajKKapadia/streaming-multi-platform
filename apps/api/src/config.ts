@@ -10,6 +10,11 @@ export type Config = {
   mediaRoot: string;
   webRoot: string;
   production: boolean;
+  recordingsRoot: string;
+  egressRecordingsRoot: string;
+  recordingsEnabled: boolean;
+  recordingRendererUrl: string;
+  ffmpegPath: string;
 };
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const root = resolve(import.meta.dir, "../../..");
@@ -28,6 +33,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     mediaRoot: resolve(env.MEDIA_ROOT || resolve(root, "media")),
     webRoot: resolve(root, "apps/web/dist"),
     production: env.NODE_ENV === "production",
+    recordingsRoot: resolve(env.RECORDINGS_ROOT || resolve(root, ".local/recordings")),
+    egressRecordingsRoot: env.EGRESS_RECORDINGS_ROOT || "/recordings",
+    recordingsEnabled: env.RECORDINGS_ENABLED === "true" ||
+      (env.RECORDINGS_ENABLED !== "false" && /^wss?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(env.LIVEKIT_URL || "")),
+    recordingRendererUrl: (env.RECORDING_RENDERER_URL || env.PUBLIC_APP_URL || "http://localhost:3001").replace(/\/$/, ""),
+    ffmpegPath: env.FFMPEG_PATH || "ffmpeg",
   };
 }
 export function configurationIssues(c: Config): string[] {
