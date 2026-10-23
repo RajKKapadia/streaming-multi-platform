@@ -26,6 +26,7 @@ import {
   ArrowLeft,
   RefreshCw,
   MessageSquare,
+  Circle,
 } from "lucide-react";
 import { Button, Dialog, Input } from "@studio/ui";
 import {
@@ -55,6 +56,7 @@ import { MediaPanel } from "./MediaPanel";
 import { MessagesPanel, useStudioMessages } from "./MessagesPanel";
 import { PeoplePanel } from "./PeoplePanel";
 import { Destinations } from "./Destinations";
+import { Recordings, useRecordings, recordingActive } from "./Recordings";
 import { useRoomUpdates, type Capture } from "./devices";
 function GlyphPerson({ x, y, size = 1 }: { x: number; y: number; size?: number }) {
   return (
@@ -167,6 +169,7 @@ export function Studio({
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false),
     [destinations, setDestinations] = useState(false),
+    [recordingsOpen, setRecordingsOpen] = useState(false),
     [invite, setInvite] = useState(""),
     [inviting, setInviting] = useState(false),
     [copied, setCopied] = useState(false),
@@ -180,6 +183,8 @@ export function Studio({
   const [deviceBusy, setDeviceBusy] = useState(false);
   const preferences = usePreferences();
   const host = preview || joinData?.role === "host";
+  const recordings = useRecordings(studioId, host && !preview);
+  const activeRecording = recordings.snapshot?.recordings.find(recordingActive);
   const sources: Source[] = room
     ? roomSources(room)
     : [
@@ -509,6 +514,10 @@ export function Studio({
           )}
           {host && (
             <>
+              <Button variant={activeRecording ? "danger" : "secondary"} size="sm" onClick={() => setRecordingsOpen(true)} aria-label={activeRecording ? "Recording in progress. Open recordings" : "Open recordings"}>
+                <Circle size={14} fill={activeRecording ? "currentColor" : "none"} />
+                {activeRecording ? "REC" : "Record"}
+              </Button>
               <Button variant="secondary" size="sm" onClick={() => setDestinations(true)}>
                 <Plus size={16} />
                 Destinations
@@ -976,6 +985,7 @@ export function Studio({
         status={status}
         onSaved={() => void refreshStatus()}
       />
+      {host && <Recordings open={recordingsOpen} onClose={() => setRecordingsOpen(false)} studioId={studioId} preview={preview} connected={connected} title={state.title} data={recordings} />}
       <Dialog
         open={!!invite}
         onOpenChange={(v) => {

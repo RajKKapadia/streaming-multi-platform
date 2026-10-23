@@ -10,6 +10,9 @@ def main() -> None:
         raise SystemExit("This stack uses Linux host networking; run it on the Linux workstation.")
 
     root = Path(__file__).resolve().parents[1]
+    # Persistent bind mount for Egress segments; survives container replacement.
+    recordings = Path(os.environ.get("RECORDINGS_ROOT") or root / ".local" / "recordings")
+    recordings.mkdir(parents=True, exist_ok=True, mode=0o770)
     target = root / ".local" / "livekit"
     expected = [target / name for name in ("app.env", "livekit.yaml", "egress.yaml")]
     existing = [path for path in expected if path.exists()]

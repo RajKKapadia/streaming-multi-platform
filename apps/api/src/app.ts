@@ -8,19 +8,23 @@ import {
   destinationSchema,
   messageInputSchema,
   visualSchema,
+  recordingInputSchema,
 } from "@studio/contracts";
 import { configurationIssues, type Config } from "./config";
 import { Auth, matchesPasscode, type Claims } from "./auth";
 import { MediaLibrary } from "./media";
 import { LiveKitGateway, type Gateway } from "./livekit";
 import { StudioService } from "./service";
+import { RecordingService, RecordingError } from "./recordings";
 const studioSchema = z.string().regex(/^[a-z0-9-]{1,64}$/);
 export function createApp(config: Config, gateway?: Gateway) {
   const app = express(),
     auth = new Auth(config.secret),
     media = new MediaLibrary(config.mediaRoot);
   const mediaAccess = new Map<string, { token: string; expires: number }>();
-  const service = new StudioService(config, gateway ?? new LiveKitGateway(config), auth, media);
+  const livekit = gateway ?? new LiveKitGateway(config);
+  const service = new StudioService(config, livekit, auth, media);
+  const recordings = new RecordingService(config, livekit, auth);
   const mediaAssets = async (studio: string) => {
     let entry = mediaAccess.get(studio);
     if (!entry || entry.expires < Date.now() + 3600_000) {
@@ -289,6 +293,37 @@ export function createApp(config: Config, gateway?: Gateway) {
   app.post("/api/studios/:studio/broadcast/stop", host, async (_req, res) =>
     res.json(await service.stop(res.locals.studio)),
   );
+  app.get("/api/studios/:studio/recordings", host, async (_req, res) =>
+    res.json(await recordings.snapshot(res.locals.studio)),
+  );
+  app.post("/api/studios/:studio/recordings/start", host, async (req, res) => {
+    const input = recordingInputSchema.safeParse(req.body);
+    if (!input.success)
+      return res.status(400).json({ error: "Enter a recording name and valid folder." });
+    res.json(await recordings.start(res.locals.studio, input.data));
+  });
+  const recordingId: express.RequestHandler = (req, res, next) => {
+    if (!z.string().uuid().safeParse(req.params.id).success)
+      return res.status(400).json({ error: "Invalid recording identifier." });
+    next();
+  };
+  app.post("/api/studios/:studio/recordings/:id/stop", host, recordingId, async (req, res) =>
+    res.json(await recordings.stop(res.locals.studio, String(req.params.id))),
+  );
+  app.post("/api/studios/:studio/recordings/:id/export", host, recordingId, async (req, res) =>
+    res.json(await recordings.export(res.locals.studio, String(req.params.id))),
+  );
+  app.get(
+    "/api/studios/:studio/recordings/:id/download",
+    host,
+    recordingId,
+    async (req, res, next) => {
+      const file = await recordings.download(res.locals.studio, String(req.params.id));
+      res.download(file.path, file.name, { dotfiles: "allow" }, (error) => {
+        if (error && !res.headersSent) next(error);
+      });
+    },
+  );
   if (existsSync(config.webRoot)) {
     app.use(express.static(config.webRoot));
     app.get("/{*path}", (req, res) =>
@@ -301,16 +336,25 @@ export function createApp(config: Config, gateway?: Gateway) {
     (error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
       // Never echo provider messages: they can contain RTMP keys or access tokens.
       const text = error instanceof Error ? error.message : "";
+      const recordingStorageIssue =
+        _req.path.includes("/recordings") &&
+        ["EACCES", "EPERM", "ENOSPC", "EROFS"].includes(
+          (error as NodeJS.ErrnoException)?.code || "",
+        );
       const safe =
-        /^(This |The stage |Add |Stop |Choose |Use a |Enter |Enable |Set PUBLIC_APP_URL|End the current|Some outputs|Provide |Invalid studio)/.test(
-          text,
-        )
+        error instanceof RecordingError
           ? text
-          : "The studio request failed. Check the server configuration and try again.";
+          : recordingStorageIssue
+            ? "The recording folder is unavailable or full. Check free space, RECORDINGS_ROOT, and Egress group permissions."
+            : /^(This |The stage |Add |Stop |Choose |Use a |Enter |Enable |Set PUBLIC_APP_URL|End the current|Some outputs|Provide |Invalid studio)/.test(
+                  text,
+                )
+              ? text
+              : "The studio request failed. Check the server configuration and try again.";
       res.status(400).json({ error: safe });
     },
   );
-  return { app, service };
+  return { app, service, recordings };
 }
 function cookie(res: express.Response, value: string, config: Config) {
   res.cookie("studio-session", value, {

@@ -22,6 +22,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (existsSync(file))
     for (const [key, value] of Object.entries(parseEnv(readFileSync(file, "utf8"))))
       if (process.env[key] === undefined) process.env[key] = value;
+  const localLivekit = /^wss?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(env.LIVEKIT_URL || "");
   return {
     port: Number(env.PORT || 3001),
     publicUrl: (env.PUBLIC_APP_URL || "http://localhost:3001").replace(/\/$/, ""),
@@ -35,9 +36,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     production: env.NODE_ENV === "production",
     recordingsRoot: resolve(env.RECORDINGS_ROOT || resolve(root, ".local/recordings")),
     egressRecordingsRoot: env.EGRESS_RECORDINGS_ROOT || "/recordings",
-    recordingsEnabled: env.RECORDINGS_ENABLED === "true" ||
-      (env.RECORDINGS_ENABLED !== "false" && /^wss?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(env.LIVEKIT_URL || "")),
-    recordingRendererUrl: (env.RECORDING_RENDERER_URL || env.PUBLIC_APP_URL || "http://localhost:3001").replace(/\/$/, ""),
+    recordingsEnabled:
+      env.RECORDINGS_ENABLED === "true" || (env.RECORDINGS_ENABLED !== "false" && localLivekit),
+    recordingRendererUrl: (
+      env.RECORDING_RENDERER_URL ||
+      (localLivekit
+        ? `http://127.0.0.1:${env.PORT || 3001}`
+        : env.PUBLIC_APP_URL || "http://localhost:3001")
+    ).replace(/\/$/, ""),
     ffmpegPath: env.FFMPEG_PATH || "ffmpeg",
   };
 }

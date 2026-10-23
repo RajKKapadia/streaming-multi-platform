@@ -1,9 +1,11 @@
 import { loadConfig, configurationIssues } from "./config";
 import { createApp } from "./app";
 const config = loadConfig();
-const { app, service } = createApp(config);
+const { app, service, recordings } = createApp(config);
 const maintenance = setInterval(() => void service.maintain(), 1000);
 maintenance.unref();
+const recordingMaintenance = setInterval(() => void recordings.maintain(), 5000);
+recordingMaintenance.unref();
 const server = app.listen(config.port, () => {
   console.log(`Studio API listening on http://localhost:${config.port}`);
   for (const issue of configurationIssues(config)) console.log(`Setup: ${issue}`);

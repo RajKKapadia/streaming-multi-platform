@@ -39,6 +39,11 @@ export const config: Config = {
   mediaRoot: "/tmp/nonexistent-studio-media",
   webRoot: "/tmp/no-web",
   production: false,
+  recordingsRoot: "/tmp/nonexistent-studio-recordings",
+  egressRecordingsRoot: "/recordings",
+  recordingsEnabled: true,
+  recordingRendererUrl: "https://studio.example.com",
+  ffmpegPath: "ffmpeg",
 };
 export class FakeGateway implements Gateway {
   state = initialState();
@@ -96,6 +101,9 @@ export class FakeGateway implements Gateway {
   }
   async list() {
     return this.listed ? this.jobs : [];
+  }
+  async startRecording(): Promise<EgressInfo> {
+    throw new Error("Recording gateway is not configured in this fixture.");
   }
   async stop(id: string) {
     this.stops.push(id);

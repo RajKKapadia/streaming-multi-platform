@@ -5,6 +5,7 @@
     "background-browser.ts",
     "stream-quality-browser.ts",
     "voice-browser.tsx",
-    "voice.test.ts"
+    "voice.test.ts",
+    "recording-browser.tsx"
   ]
 }

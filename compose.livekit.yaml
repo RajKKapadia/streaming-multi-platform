@@ -41,6 +41,9 @@ services:
 
   egress:
     <<: *service
+    # Egress uses uid 1001; grant it the API user's recording-folder group.
+    group_add:
+      - "${RECORDINGS_GID:-1000}"
     image: livekit/egress:v1.15.0
     environment:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Run scripts/prepare-local-livekit.py and pass --env-file .local/livekit/app.env}
@@ -48,6 +51,7 @@ services:
       EGRESS_CONFIG_FILE: /etc/egress.yaml
     volumes:
       - ./.local/livekit/egress.yaml:/etc/egress.yaml:ro
+      - ${RECORDINGS_ROOT:-./.local/recordings}:/recordings
     cap_add:
       - SYS_ADMIN
     shm_size: 1gb

@@ -10,6 +10,7 @@ media/**/*
 test-results/
 .local/livekit/
 .local/voice-browser/
+.local/recordings/
 
 # Local X article drafts and publication bundle
 /docs/broadcast-studio-x-article.zip

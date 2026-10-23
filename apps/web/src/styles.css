@@ -667,6 +667,19 @@ svg {
   align-items: center;
   gap: 11px;
 }
+.recordings-dialog { width: min(720px, calc(100vw - 28px)); }
+.recording-storage { padding: 14px; background: #f2f5fa; border-radius: 8px; margin-bottom: 18px; }
+.recording-storage strong { display: block; font-size: 13px; margin-bottom: 8px; }
+.recording-storage code, .recording-path { display: block; overflow-wrap: anywhere; font-size: 11px; color: var(--text-secondary); }
+.recording-form { display: grid; gap: 12px; margin-bottom: 22px; }
+.recording-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 600; }
+.recording-list { display: grid; gap: 12px; }
+.recording-card { padding: 14px; border: 1px solid var(--border); border-radius: 8px; }
+.recording-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.recording-heading strong { overflow-wrap: anywhere; min-width: 0; }
+.recording-state { font-size: 11px; text-transform: capitalize; }
+.recording-now { color: #b42318; font-weight: 700; }
+.recording-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .ready-pill,
 .live-pill {
   display: flex;

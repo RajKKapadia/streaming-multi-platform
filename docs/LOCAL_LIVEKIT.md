@@ -5,6 +5,12 @@ Linux host as the browser studio. Egress can process multiple jobs; the current
 YouTube, Twitch, and X defaults create three separate rendering/encoding jobs.
 Start acceptance with one destination before exercising all three.
 
+The **Record** control uses an additional independent Egress job with continuous
+two-second HLS segments on disk and MP4 export. The default bind mount is
+`.local/recordings:/recordings`; these files survive container replacement.
+FFmpeg must be installed on the API host. See [recording and recovery](../README.md#continuous-recording-and-recovery)
+for folder selection, Save so far, interrupted-session recovery, and validation.
+
 The stack uses Linux host networking. LiveKit signaling and Redis bind to
 localhost. Egress reaches LiveKit and the studio through the host's localhost.
 This configuration does not support guests on other devices or the internet yet.
@@ -59,9 +65,10 @@ credentials or that file is updated. `.local/livekit/app.env` contains only loca
 LiveKit credentials, so the host passcode, signing secret, media folder, and
 destination settings can continue to come from the existing root `.env`.
 
-The app currently requires an HTTPS `PUBLIC_APP_URL` before starting Egress.
-The next application step is to configure a separate internal renderer URL or a
-reachable HTTPS renderer, then verify:
+Streaming requires an HTTPS `PUBLIC_APP_URL` before starting Egress. Local
+recording defaults to the built renderer on `http://127.0.0.1:<PORT>` and can
+override that address with `RECORDING_RENDERER_URL`. Build the frontend and
+verify:
 
 1. Local host/guest audio and video, room metadata, layouts, screen sharing, and
    reconnection using separate browser sessions on this workstation.
