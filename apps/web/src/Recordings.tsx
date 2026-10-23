@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Circle, Download, Square } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertTriangle, Circle, Download, Square, Trash2 } from "lucide-react";
 import { Button, Dialog, Input } from "@studio/ui";
 import type { Recording, RecordingsSnapshot } from "@studio/contracts";
 import { api, studioPath } from "./api";
@@ -58,8 +58,34 @@ export function Recordings({
   const [folder, setFolder] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [cleanup, setCleanup] = useState<Recording[] | null>(null);
+  const cleanupActions = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (cleanup) cleanupActions.current?.querySelector("button")?.focus();
+  }, [cleanup]);
   const { snapshot, setSnapshot } = data;
   const active = snapshot?.recordings.find(recordingActive);
+  const cleanupBlocked =
+    !!busy || !!active || !!snapshot?.recordings.some((r) => r.exportStatus === "exporting");
+  const confirmCleanup = async () => {
+    if (busy || !cleanup) return;
+    setBusy("clear");
+    setError("");
+    try {
+      setSnapshot(
+        await api<RecordingsSnapshot>(studioPath(studioId, "recordings/clear"), {
+          confirmed: true,
+          ids: cleanup.map((recording) => recording.id),
+        }),
+      );
+      setCleanup(null);
+    } catch (e) {
+      setError((e as Error).message);
+      void data.refresh();
+    } finally {
+      setBusy("");
+    }
+  };
   const action = async (path: string, body: unknown = {}) => {
     if (busy) return;
     setBusy(path);
@@ -107,13 +133,50 @@ export function Recordings({
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (!v) onClose();
+        if (!v && busy !== "clear") {
+          setCleanup(null);
+          onClose();
+        }
       }}
-      title="Recordings"
-      description="Record the full program, with or without streaming."
+      title={cleanup ? "Clear recording folders?" : "Recordings"}
+      description={
+        cleanup
+          ? `Permanently delete ${cleanup.length} recording${cleanup.length === 1 ? "" : "s"} from this studio.`
+          : "Record the full program, with or without streaming."
+      }
       className="recordings-dialog"
     >
-      {preview ? (
+      {cleanup ? (
+        <div className="recording-cleanup-warning">
+          <p className="recording-cleanup-heading">
+            <AlertTriangle size={19} aria-hidden="true" />
+            <strong>This cannot be undone.</strong>
+          </p>
+          <p>
+            Save a copy before continuing. This removes MP4 exports, recovery segments, playlists,
+            and recording history from the folders below.
+          </p>
+          <ul aria-label="Recordings to delete">
+            {cleanup.map((recording) => (
+              <li key={recording.id}>
+                <strong>{recording.name}</strong>
+                <code className="recording-path">{recording.directory}</code>
+              </li>
+            ))}
+          </ul>
+          <p>Copies already saved elsewhere and other studios’ recordings are kept.</p>
+          {cleanupBlocked && busy !== "clear" && (
+            <p className="field-error" role="status">
+              Wait for recording, exporting, or saving to finish before clearing.
+            </p>
+          )}
+          {error && (
+            <p className="field-error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+      ) : preview ? (
         <p className="hint">
           Connect your studio as host to record. Interface preview cannot record.
         </p>
@@ -272,10 +335,55 @@ export function Recordings({
           </p>
         </>
       )}
-      <div className="dialog-footer">
-        <Button variant="secondary" onClick={onClose}>
-          Close
-        </Button>
+      <div className="dialog-footer" ref={cleanupActions}>
+        {cleanup ? (
+          <>
+            <Button
+              variant="secondary"
+              disabled={busy === "clear"}
+              onClick={() => {
+                setCleanup(null);
+                setError("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={cleanupBlocked}
+              onClick={() => void confirmCleanup()}
+            >
+              <Trash2 size={15} />
+              {busy === "clear" ? "Clearing…" : "Delete permanently"}
+            </Button>
+          </>
+        ) : (
+          <>
+            {!preview && (
+              <Button
+                variant="danger"
+                disabled={!snapshot?.recordings.length || cleanupBlocked}
+                onClick={() => {
+                  setError("");
+                  setCleanup(snapshot!.recordings.slice(0, 500));
+                }}
+                title={
+                  cleanupBlocked
+                    ? "Finish recording, exporting, and saving before clearing."
+                    : "Permanently delete this studio’s saved recording folders"
+                }
+              >
+                <Trash2 size={15} />
+                {(snapshot?.recordings.length || 0) > 500
+                  ? "Clear 500 recordings…"
+                  : "Clear recordings…"}
+              </Button>
+            )}
+            <Button variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+          </>
+        )}
       </div>
     </Dialog>
   );

@@ -26,13 +26,26 @@ export async function foregroundChecks(report: (message: string) => void) {
     const pixels = new Uint8Array(output.width * output.height * 4);
     gl.readPixels(0, 0, output.width, output.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     let clear = 0,
-      opaque = 0;
+      opaque = 0,
+      xTotal = 0,
+      yTotal = 0;
     for (let i = 3; i < pixels.length; i += 4) {
       if (pixels[i]! < 10) clear++;
-      if (pixels[i]! > 240) opaque++;
+      if (pixels[i]! > 240) {
+        opaque++;
+        const pixel = (i - 3) / 4;
+        xTotal += pixel % output.width;
+        yTotal += Math.floor(pixel / output.width);
+      }
     }
     if (gl.getError() !== gl.NO_ERROR) throw new Error("Presenter cutout produced a GPU error.");
-    return { clear, opaque, total: pixels.length / 4 };
+    return {
+      clear,
+      opaque,
+      total: pixels.length / 4,
+      x: xTotal / opaque,
+      y: yTotal / opaque,
+    };
   };
   try {
     await video.play();
@@ -53,6 +66,20 @@ export async function foregroundChecks(report: (message: string) => void) {
     if (person.clear < 1000 || person.opaque < 1000)
       throw new Error("The presenter must stay opaque while its background becomes transparent.");
     report("PASS real-model presenter foreground and transparent background pixels");
+    for (const [width, height] of [[1280, 720], [1920, 1080]] as const) {
+      input.width = width;
+      input.height = height;
+      const highResolution = await sample();
+      if (output.width !== 640 || output.height !== 360)
+        throw new Error(`${width} × ${height} camera changed the cutout rendering dimensions.`);
+      if (
+        highResolution.opaque < person.opaque * 0.85 ||
+        Math.abs(highResolution.x - person.x) > 10 ||
+        Math.abs(highResolution.y - person.y) > 10
+      )
+        throw new Error(`${width} × ${height} camera shrank or displaced the presenter cutout.`);
+    }
+    report("PASS 720p and 1080p cameras preserve presenter size and position");
     input.width = 320;
     input.height = 180;
     await sample();

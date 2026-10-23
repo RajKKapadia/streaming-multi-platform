@@ -8,6 +8,7 @@ import {
   lstat,
   realpath,
   rm,
+  rmdir,
 } from "node:fs/promises";
 import { join, posix, resolve, relative, isAbsolute, dirname } from "node:path";
 import { spawn } from "node:child_process";
@@ -39,7 +40,7 @@ const pending = (r: Manifest) => ["starting", "recording", "stopping"].includes(
 export class RecordingError extends Error {}
 
 // Egress and the API share RECORDINGS_ROOT. Only closed segments referenced by the
-// event playlist are used for exports. Originals are never deleted by this service.
+// event playlist are used for exports. Originals are retained until confirmed cleanup.
 export class RecordingService {
   private queues = new Map<string, Promise<unknown>>();
   private exports = new Map<string, Promise<void>>();
@@ -222,6 +223,64 @@ export class RecordingService {
     if (!path)
       throw new RecordingError("The recording export is missing. Export the saved segments again.");
     return { path, name: `${r.name.replace(/[^a-zA-Z0-9_-]/g, "_") || "recording"}.mp4` };
+  }
+
+  async clear(studio: string, ids: string[]) {
+    await this.serial(studio, async () => {
+      // Read without reconcile: cleanup must not start an automatic export just
+      // before deleting it. Starts, exports and maintenance share this studio lock.
+      const records = await this.records(studio);
+      if (
+        records.some((r) => pending(r) || r.exportStatus === "exporting" || this.exports.has(r.id))
+      )
+        throw new RecordingError(
+          "Stop recording and wait for all MP4 exports to finish before clearing recordings.",
+        );
+      const selected = ids.map((id) => records.find((r) => r.id === id));
+      if (!ids.length || new Set(ids).size !== ids.length || selected.some((r) => !r))
+        throw new RecordingError(
+          "The recording list changed. Refresh it and confirm cleanup again.",
+        );
+      // Validate every target before deleting anything. Never remove the base
+      // folder, another studio's files, or a path supplied by the HTTP client.
+      const targets: { record: Manifest; directory?: string }[] = [];
+      for (const record of selected as Manifest[]) {
+        const suffix = `${studio}/${record.id}`;
+        if (
+          record.relativeDirectory !== posix.normalize(record.relativeDirectory) ||
+          !(record.relativeDirectory === suffix || record.relativeDirectory.endsWith(`/${suffix}`))
+        )
+          throw new RecordingError("Invalid recording folder. Cleanup was cancelled.");
+        try {
+          targets.push({
+            record,
+            directory: await this.directory(record.relativeDirectory, false),
+          });
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          targets.push({ record });
+        }
+      }
+      const base = await realpath(this.config.recordingsRoot);
+      const index = await this.directory(`.index/${studio}`, false);
+      for (const target of targets) {
+        if (target.directory) await rm(target.directory, { recursive: true, force: true });
+        // Keep the manifest if deletion failed, so the user can retry cleanup.
+        await rm(join(index, `${target.record.id}.json`), { force: true });
+        if (target.directory) {
+          let parent = dirname(target.directory);
+          while (parent !== base) {
+            try {
+              await rmdir(parent);
+            } catch {
+              break;
+            } // Only empty parent folders are removed.
+            parent = dirname(parent);
+          }
+        }
+      }
+    });
+    return this.snapshot(studio);
   }
 
   async maintain() {

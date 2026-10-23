@@ -383,6 +383,14 @@ export const recordingInputSchema = z.object({
   folder: z.string().trim().max(200).default(""),
 });
 export type RecordingInput = z.infer<typeof recordingInputSchema>;
+export const recordingCleanupSchema = z.object({
+  confirmed: z.literal(true),
+  ids: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(500)
+    .refine((ids) => new Set(ids).size === ids.length, "Choose each recording only once."),
+});
 export type Recording = {
   id: string;
   name: string;

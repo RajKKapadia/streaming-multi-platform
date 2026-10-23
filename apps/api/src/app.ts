@@ -9,6 +9,7 @@ import {
   messageInputSchema,
   visualSchema,
   recordingInputSchema,
+  recordingCleanupSchema,
 } from "@studio/contracts";
 import { configurationIssues, type Config } from "./config";
 import { Auth, matchesPasscode, type Claims } from "./auth";
@@ -301,6 +302,12 @@ export function createApp(config: Config, gateway?: Gateway) {
     if (!input.success)
       return res.status(400).json({ error: "Enter a recording name and valid folder." });
     res.json(await recordings.start(res.locals.studio, input.data));
+  });
+  app.post("/api/studios/:studio/recordings/clear", host, async (req, res) => {
+    const input = recordingCleanupSchema.safeParse(req.body);
+    if (!input.success)
+      return res.status(400).json({ error: "Confirm cleanup and select the recordings to clear." });
+    res.json(await recordings.clear(res.locals.studio, input.data.ids));
   });
   const recordingId: express.RequestHandler = (req, res, next) => {
     if (!z.string().uuid().safeParse(req.params.id).success)

@@ -680,6 +680,11 @@ svg {
 .recording-state { font-size: 11px; text-transform: capitalize; }
 .recording-now { color: #b42318; font-weight: 700; }
 .recording-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.recording-cleanup-warning { display: grid; gap: 14px; font-size: 13px; line-height: 1.6; }
+.recording-cleanup-heading { display: flex; align-items: center; gap: 8px; color: #b42318; }
+.recording-cleanup-warning ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.recording-cleanup-warning li { border: 1px solid #fed7aa; border-radius: 8px; padding: 12px; background: #fff7ed; overflow-wrap: anywhere; }
+.recordings-dialog .dialog-footer { flex-wrap: wrap; }
 .ready-pill,
 .live-pill {
   display: flex;

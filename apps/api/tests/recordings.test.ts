@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { mkdtemp, rm, readFile, writeFile, symlink, readdir } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, symlink, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -300,16 +300,29 @@ test("host-only recording routes reject guests, render tokens, cross-studio cook
         purpose: role === "renderer" ? "render" : "session",
         expires: Date.now() + 60_000,
       });
-    const request = (suffix: string, method: string, cookie: string) =>
+    const request = (
+      suffix: string,
+      method: string,
+      cookie: string,
+      body: unknown = { name: "Test", folder: "" },
+    ) =>
       fetch(base + suffix, {
         method,
         headers: { Cookie: `studio-session=${cookie}`, "Content-Type": "application/json" },
-        ...(method === "POST" ? { body: JSON.stringify({ name: "Test", folder: "" }) } : {}),
+        ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
       });
     for (const role of ["guest", "renderer"] as const) {
       const expected = role === "renderer" ? 401 : 403;
       expect((await request("", "GET", token(role))).status).toBe(expected);
       expect((await request("/start", "POST", token(role))).status).toBe(expected);
+      expect(
+        (
+          await request("/clear", "POST", token(role), {
+            confirmed: true,
+            ids: [crypto.randomUUID()],
+          })
+        ).status,
+      ).toBe(expected);
       expect((await request(`/${crypto.randomUUID()}/download`, "GET", token(role))).status).toBe(
         expected,
       );
@@ -342,8 +355,119 @@ test("host-only recording routes reject guests, render tokens, cross-studio cook
         "utf8",
       ),
     ).toContain("record-0");
+    expect((await request("/clear", "POST", token("host"), { ids: [record.id] })).status).toBe(400);
+    expect(
+      (await request("/clear", "POST", token("host"), { confirmed: true, ids: [record.id] }))
+        .status,
+    ).toBe(400);
+    await recordings.stop("personal", record.id);
+    const cleared = await request("/clear", "POST", token("host"), {
+      confirmed: true,
+      ids: [record.id],
+    });
+    expect(cleared.status).toBe(200);
+    expect((await cleared.json()).recordings).toEqual([]);
+    await expect(stat(record.directory)).rejects.toMatchObject({ code: "ENOENT" });
   } finally {
     server.close();
     await rm(f.root, { recursive: true, force: true });
+  }
+});
+
+async function completed(service: RecordingService, studio = "personal", folder = "") {
+  const record = (await service.start(studio, { name: `Cleanup ${studio}`, folder }))
+    .recordings[0]!;
+  await service.stop(studio, record.id);
+  return record;
+}
+
+test("cleanup removes the confirmed recording folders and history while preserving newer recordings, other studios and unrelated files", async () => {
+  const f = await fixture();
+  try {
+    const first = await completed(f.service, "personal", "courses/lesson-01");
+    const second = await completed(f.service, "personal", "courses/lesson-02");
+    for (const record of [first, second]) {
+      await writeFile(join(record.directory, "recording.mp4"), "exported video");
+      await writeFile(join(record.directory, "segment_00001.ts"), "saved segment");
+      await writeFile(join(record.directory, "export-interrupted.partial.mp4"), "partial export");
+    }
+    const other = await completed(f.service, "other", "courses/lesson-01");
+    await writeFile(join(other.directory, "recording.mp4"), "other studio video");
+    // This recording appeared after the confirmation list was captured.
+    const newer = await completed(f.service);
+    await writeFile(join(f.root, "keep.txt"), "unrelated file");
+    const cleared = await f.service.clear("personal", [first.id, second.id]);
+    expect(cleared.recordings.map((r) => r.id)).toEqual([newer.id]);
+    for (const record of [first, second]) {
+      await expect(stat(record.directory)).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(
+        stat(join(f.root, ".index/personal", `${record.id}.json`)),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    }
+    expect(await readFile(join(other.directory, "recording.mp4"), "utf8")).toBe(
+      "other studio video",
+    );
+    expect(await readFile(join(f.root, "keep.txt"), "utf8")).toBe("unrelated file");
+    expect((await stat(f.root)).isDirectory()).toBe(true);
+  } finally {
+    await rm(f.root, { recursive: true, force: true });
+  }
+});
+
+test("cleanup rejects active, stopping and exporting recordings on the server", async () => {
+  const f = await fixture();
+  try {
+    const record = (await f.service.start("personal", { name: "Busy recording", folder: "" }))
+      .recordings[0]!;
+    await expect(f.service.clear("personal", [record.id])).rejects.toThrow("Stop recording");
+    f.gateway.stopEnding = true;
+    await f.service.stop("personal", record.id);
+    await expect(f.service.clear("personal", [record.id])).rejects.toThrow("Stop recording");
+    f.gateway.jobs[0]!.status = EgressStatus.EGRESS_COMPLETE;
+    await f.service.snapshot("personal");
+    const index = join(f.root, ".index/personal", `${record.id}.json`);
+    const manifest = JSON.parse(await readFile(index, "utf8"));
+    await writeFile(index, JSON.stringify({ ...manifest, exportStatus: "exporting" }));
+    await expect(f.service.clear("personal", [record.id])).rejects.toThrow("MP4 exports");
+    expect((await stat(record.directory)).isDirectory()).toBe(true);
+  } finally {
+    await rm(f.root, { recursive: true, force: true });
+  }
+});
+
+test("cleanup validates all paths and studio IDs before deleting anything and does not follow symlinks", async () => {
+  const f = await fixture();
+  const outside = await mkdtemp(join(tmpdir(), "recording-cleanup-outside-"));
+  try {
+    const first = await completed(f.service);
+    const second = await completed(f.service);
+    await writeFile(join(first.directory, "recording.mp4"), "keep until confirmed");
+    await writeFile(join(outside, "keep.txt"), "outside data");
+    await expect(f.service.clear("other", [first.id])).rejects.toThrow("list changed");
+    await expect(f.service.clear("personal", [first.id, crypto.randomUUID()])).rejects.toThrow(
+      "list changed",
+    );
+    const index = join(f.root, ".index/personal", `${second.id}.json`);
+    const manifest = JSON.parse(await readFile(index, "utf8"));
+    await writeFile(index, JSON.stringify({ ...manifest, relativeDirectory: "personal" }));
+    await expect(f.service.clear("personal", [first.id, second.id])).rejects.toThrow(
+      "Invalid recording folder",
+    );
+    expect(await readFile(join(first.directory, "recording.mp4"), "utf8")).toBe(
+      "keep until confirmed",
+    );
+    await writeFile(index, JSON.stringify(manifest));
+    await rm(second.directory, { recursive: true });
+    await symlink(outside, second.directory);
+    await expect(f.service.clear("personal", [first.id, second.id])).rejects.toThrow(
+      "symbolic links",
+    );
+    expect(await readFile(join(first.directory, "recording.mp4"), "utf8")).toBe(
+      "keep until confirmed",
+    );
+    expect(await readFile(join(outside, "keep.txt"), "utf8")).toBe("outside data");
+  } finally {
+    await rm(f.root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
   }
 });
