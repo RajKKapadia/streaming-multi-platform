@@ -144,7 +144,7 @@ export function VoiceSettings({ microphone }: { microphone?: LocalAudioTrack }) 
         max={max}
         step={step}
         value={Number(p[key])}
-        disabled={!p.enabled || recording}
+        disabled={!p.enabled || recording || (key === "levelingAmount" && !p.leveling)}
         onChange={(e) => set({ [key]: Number(e.target.value) })}
       />
     </label>
@@ -190,7 +190,12 @@ export function VoiceSettings({ microphone }: { microphone?: LocalAudioTrack }) 
       </label>
       {toggle("noiseReduction", "Fan and keyboard noise removal")}
       {toggle("expander", "Soften background noise between words")}
-      {toggle("leveling", "Keep speech loudness consistent")}
+      {toggle("leveling", "Loudness normalization")}
+      {range("levelingAmount", "Normalization amount", 0, 6, 0.5, "dB")}
+      <p className="hint">
+        Gently evens out speech by up to this amount. Starts at 3 dB; quiet pauses hold the gain
+        steady.
+      </p>
       {meters && (
         <div className="voice-meters" aria-label="Processed microphone levels">
           <span>
@@ -203,6 +208,13 @@ export function VoiceSettings({ microphone }: { microphone?: LocalAudioTrack }) 
             Live loudness{" "}
             <strong>
               {meters.loudness > -60 ? `${meters.loudness.toFixed(1)} LUFS` : "Quiet"}
+            </strong>
+          </span>
+          <span>
+            Normalization
+            <strong>
+              {meters.levelGainDb >= 0 ? "+" : ""}
+              {meters.levelGainDb.toFixed(1)} dB
             </strong>
           </span>
         </div>

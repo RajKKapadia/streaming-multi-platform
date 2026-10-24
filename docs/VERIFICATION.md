@@ -151,6 +151,14 @@ Chrome checks with canvas video and a public MediaPipe sample portrait confirmed
 
 All 45 repository tests passed, along with workspace type checks, browser-harness type checks, lint, production build, and whitespace checks. The existing bundle-size warning remains. Background removal needs WebGL 2 and the MediaPipe model/WASM hosts; loading or processing failures show a status in the presenter area without exposing the unprocessed camera background.
 
+## Gentle microphone loudness normalization — 2026-10-24
+
+The existing microphone leveling stage now has a saved **Normalization amount** control from 0 to 6 dB, with a gentle default limit of ±3 dB in both voice presets and older saved preferences. This replaces the previous fixed +6/−12 dB bounds. The existing target, noise cleanup, tone, compressor, and limiter settings are retained. Quiet pauses hold the correction; lowering the amount, setting it to zero, or bypassing normalization fades the correction back even during silence. The Audio settings meter shows the applied correction.
+
+All 67 repository tests pass with local networking enabled for the HTTP tests, including 13 voice tests. New PCM checks cover older saved settings, gentle correction of quiet and loud signals, the amount limit, live reductions during silence, zero amount, and bypass. Workspace and browser-harness type checks, lint, production build, and whitespace checks pass; the existing large SDK bundle warning remains.
+
+The separately production-built browser harness passed actual AudioWorklet normalization of a quiet generated tone, live amount changes and zero without restarting capture, slider/switch updates through the preferences and capture path, and saved-amount restoration. Existing WebRTC transport, mute/unmute, limiter, bypass, source replacement, RNNoise, and failure-recovery checks also passed. No physical microphone or streaming destination was used; the preferred normalization amount still needs a headphone comparison on the user's microphone.
+
 ## Built-in live microphone processing — 2026-10-20
 
 Settings → Audio now includes optional live voice processing, Natural speech and Warm broadcast voice presets, advanced voice controls, processed levels, and an eight-second simultaneous before/after sample recorder. Voice processing runs on the local microphone before LiveKit publication; it does not process music, clips, or screen audio. Existing setups start bypassed. The app uses local RNNoise WASM plus its own AudioWorklet DSP for expansion, rumble filtering, voice EQ, broadband de-essing, soft-knee compression, bounded live loudness leveling, and a five-millisecond lookahead sample-peak limiter. The K-weighted live loudness estimate is not integrated whole-recording normalization or a certified loudness meter. The per-microphone limiter does not certify true peaks or the mixed program.

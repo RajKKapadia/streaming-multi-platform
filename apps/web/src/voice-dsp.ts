@@ -124,6 +124,7 @@ export class VoiceDsp {
   }
   process(input: Float32Array, output: Float32Array) {
     const p = this.settings,
+      maxLevelGain = p.leveling ? p.levelingAmount : 0,
       ceiling = amplitude(p.ceiling);
     for (let i = 0; i < output.length; i++) {
       let x = Number.isFinite(input[i]) ? input[i] : 0;
@@ -179,17 +180,25 @@ export class VoiceDsp {
       // Freeze during pauses. Bounded, slow gain changes avoid chasing room noise or one syllable.
       if (
         p.leveling &&
+        maxLevelGain > 0 &&
         this.clock > this.sampleRate * 0.4 &&
         rmsDb > p.noiseFloor + 8 &&
         loudness > -45
       ) {
-        const target = Math.max(-12, Math.min(6, p.targetLufs - loudness));
+        const target = Math.max(-maxLevelGain, Math.min(maxLevelGain, p.targetLufs - loudness));
         this.levelGain = follow(
           this.levelGain,
           target,
           target < this.levelGain ? this.attenuateC : this.boostC,
         );
-      } else if (!p.leveling) this.levelGain = follow(this.levelGain, 0, this.attenuateC);
+      } else if (!p.leveling || Math.abs(this.levelGain) > maxLevelGain) {
+        // A reduced amount or bypass also takes effect during a pause, without a gain jump.
+        this.levelGain = follow(
+          this.levelGain,
+          Math.max(-maxLevelGain, Math.min(maxLevelGain, this.levelGain)),
+          this.attenuateC,
+        );
+      }
       this.outputGain = follow(this.outputGain, amplitude(this.levelGain + p.gain), this.openC);
       x *= this.outputGain;
 

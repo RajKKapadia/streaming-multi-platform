@@ -18,9 +18,25 @@ describe("voice preset selection", () => {
   });
   test("manual tone, dynamics, and cleanup changes are shown as custom settings", () => {
     const preset = voicePresets[1].settings;
-    for (const patch of [{ warmth: 3 }, { gain: -2 }, { noiseReduction: false }])
+    for (const patch of [
+      { warmth: 3 },
+      { gain: -2 },
+      { noiseReduction: false },
+      { levelingAmount: 1.5 },
+    ])
       expect(matchingVoicePreset({ ...preset, ...patch })).toBe("");
     expect(matchingVoicePreset(defaultVoiceSettings)).toBe("");
+  });
+  test("older saved settings get gentle normalization without changing tone or bypass", () => {
+    const { levelingAmount: _, ...saved } = voicePresets[1].settings;
+    const restored = voiceSettings({ ...saved, enabled: false });
+    expect(restored.levelingAmount).toBe(3);
+    expect(restored.warmth).toBe(saved.warmth);
+    expect(restored.enabled).toBe(false);
+    expect(matchingVoicePreset(restored)).toBe("warm");
+    expect(voiceSettings({ levelingAmount: 100 }).levelingAmount).toBe(6);
+    expect(voiceSettings({ levelingAmount: -5 }).levelingAmount).toBe(0);
+    expect(voiceSettings({ levelingAmount: NaN }).levelingAmount).toBe(3);
   });
 });
 
@@ -93,7 +109,11 @@ describe("live voice PCM", () => {
     expect(Math.abs(loss(1000))).toBeLessThan(0.5);
   });
   test("leveling approaches its target and does not raise gain during noise or silence", () => {
-    const { dsp } = render(tone(1000, 0.04, 10), { leveling: true, targetLufs: -23 });
+    const { dsp } = render(tone(1000, 0.04, 10), {
+      leveling: true,
+      levelingAmount: 6,
+      targetLufs: -23,
+    });
     const before = dsp.meters();
     expect(before.levelGainDb).toBeGreaterThan(2);
     expect(before.loudness).toBeGreaterThan(-27);
@@ -103,6 +123,41 @@ describe("live voice PCM", () => {
     expect(dsp.meters().levelGainDb).toBeCloseTo(before.levelGainDb, 1);
     dsp.process(new Float32Array(rate), new Float32Array(rate));
     expect(dsp.meters().levelGainDb).toBeCloseTo(before.levelGainDb, 1);
+  });
+  test("gentle normalization lifts quiet speech and softens loud speech within 3 dB", () => {
+    const quiet = render(tone(1000, 0.04, 12), { leveling: true, targetLufs: -23 });
+    const loud = render(tone(1000, 0.4, 12), { leveling: true, targetLufs: -23 });
+    expect(quiet.dsp.meters().levelGainDb).toBeGreaterThan(2.5);
+    expect(quiet.dsp.meters().levelGainDb).toBeLessThanOrEqual(3);
+    expect(loud.dsp.meters().levelGainDb).toBeLessThan(-2.5);
+    expect(loud.dsp.meters().levelGainDb).toBeGreaterThanOrEqual(-3);
+    const difference = level(loud.output.slice(-rate)) - level(quiet.output.slice(-rate));
+    expect(difference).toBeLessThan(15);
+    expect(difference).toBeGreaterThan(13);
+  });
+  test("normalization amount updates during pauses and zero or bypass removes correction", () => {
+    for (const gain of [0.04, 0.4]) {
+      const settings = { ...neutral, leveling: true, targetLufs: -23 };
+      const { dsp } = render(tone(1000, gain, 12), settings);
+      const silence = new Float32Array(rate * 4);
+      const out = new Float32Array(silence.length);
+      dsp.update({ ...settings, levelingAmount: 1 });
+      dsp.process(silence, out);
+      expect(Math.abs(dsp.meters().levelGainDb)).toBeCloseTo(1, 2);
+      dsp.update({ ...settings, levelingAmount: 0 });
+      dsp.process(silence, out);
+      expect(Math.abs(dsp.meters().levelGainDb)).toBeLessThan(0.001);
+      dsp.update(settings);
+      const speech = tone(1000, gain, 12);
+      dsp.process(speech, new Float32Array(speech.length));
+      expect(Math.abs(dsp.meters().levelGainDb)).toBeGreaterThan(2.5);
+      dsp.update({ ...settings, leveling: false });
+      dsp.process(silence, out);
+      expect(Math.abs(dsp.meters().levelGainDb)).toBeLessThan(0.001);
+    }
+    const input = tone(1000, 0.04);
+    const zero = render(input, { leveling: true, levelingAmount: 0 }).output;
+    expect(zero).toEqual(render(input, { leveling: false }).output);
   });
   test("lookahead limiter catches impulses and sustained overload at every supported ceiling", () => {
     const input = tone(1000, 4);

@@ -10,6 +10,7 @@ export type VoiceSettings = {
   compression: number;
   threshold: number;
   leveling: boolean;
+  levelingAmount: number;
   targetLufs: number;
   gain: number;
   ceiling: number;
@@ -27,6 +28,7 @@ export const defaultVoiceSettings: VoiceSettings = {
   compression: 2.5,
   threshold: -18,
   leveling: true,
+  levelingAmount: 3,
   targetLufs: -16,
   gain: 0,
   ceiling: -3,
@@ -68,6 +70,7 @@ export function voiceSettings(value: Partial<VoiceSettings> = {}): VoiceSettings
     deEss: [0, 8],
     compression: [1, 4],
     threshold: [-30, -6],
+    levelingAmount: [0, 6],
     targetLufs: [-23, -14],
     gain: [-12, 6],
     ceiling: [-6, -1],

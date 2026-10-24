@@ -95,6 +95,39 @@ button.onclick = async () => {
     assert(amplitude() > 0.08, "Processed speech-band tone is silent");
     report(`PASS actual AudioWorklet output: ${db(amplitude()).toFixed(1)} dBFS RMS`);
 
+    volume.gain.value = 0.04;
+    await pause(400);
+    const quietLevel = amplitude();
+    const normalization = {
+      ...config,
+      leveling: true,
+      levelingAmount: 3,
+      targetLufs: -23,
+    };
+    usePreferences.setState({ voice: normalization });
+    await applyMicrophoneEffect(track);
+    await pause(5500);
+    assert(track.getProcessor() === first, "Normalization restarted microphone processing");
+    assert(
+      first.meters && first.meters.levelGainDb > 1.5 && first.meters.levelGainDb <= 3,
+      "The worklet did not apply gentle bounded loudness normalization",
+    );
+    assert(amplitude() > quietLevel * 1.2, "Normalization did not lift the actual quiet output");
+    usePreferences.setState({ voice: { ...normalization, levelingAmount: 1 } });
+    await applyMicrophoneEffect(track);
+    await pause(1600);
+    assert(
+      first.meters.levelGainDb > 0.9 && first.meters.levelGainDb < 1.2,
+      "Changing the normalization amount did not reach the worklet",
+    );
+    usePreferences.setState({ voice: { ...normalization, levelingAmount: 0 } });
+    await applyMicrophoneEffect(track);
+    await pause(1600);
+    assert(Math.abs(first.meters.levelGainDb) < 0.1, "Zero amount retained normalization gain");
+    report(
+      "PASS bounded normalization lifts actual quiet audio; live amount changes and zero apply without restarting capture",
+    );
+
     usePreferences.setState({ voice: { ...config, gain: 6, ceiling: -3 } });
     await applyMicrophoneEffect(track);
     assert(
@@ -266,8 +299,7 @@ button.onclick = async () => {
       applied.push(settings);
       update(settings);
     };
-    const select = () =>
-      document.querySelector<HTMLSelectElement>('[aria-label="Voice preset"]')!;
+    const select = () => document.querySelector<HTMLSelectElement>('[aria-label="Voice preset"]')!;
     for (const preset of voicePresets) {
       applied.length = 0;
       select().value = preset.id;
@@ -292,9 +324,43 @@ button.onclick = async () => {
       }),
     );
     assert(select().value === "", "Manual adjustments retained a misleading preset label");
-    flushSync(() =>
-      usePreferences.getState().set({ voice: { ...voicePresets[1].settings } }),
+    const amount = () =>
+      document.querySelector<HTMLInputElement>('[aria-label="Normalization amount"]')!;
+    assert(amount().value === "3", "The normalization control lost its gentle default");
+    applied.length = 0;
+    const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!
+      .set!;
+    flushSync(() => {
+      setInputValue.call(amount(), "1.5");
+      amount().dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const amountDeadline = Date.now() + 2000;
+    while (
+      !applied.some((settings) => settings.levelingAmount === 1.5) &&
+      Date.now() < amountDeadline
+    )
+      await pause(20);
+    assert(
+      usePreferences.getState().voice.levelingAmount === 1.5 &&
+        applied.some((settings) => settings.levelingAmount === 1.5) &&
+        track.getProcessor() === active,
+      "Normalization amount did not persist and reach the existing processor from the slider",
     );
+    await usePreferences.persist.rehydrate();
+    flushSync(() => root.render(<Controls track={track} />));
+    assert(amount().value === "1.5", "The normalization amount was lost after storage reload");
+    const normalizationSwitch = document.querySelector<HTMLButtonElement>(
+      '[role="switch"][aria-label="Loudness normalization"]',
+    )!;
+    flushSync(() => normalizationSwitch.click());
+    assert(
+      !usePreferences.getState().voice.leveling && amount().disabled,
+      "Switching normalization off did not disable its amount control",
+    );
+    report(
+      "PASS normalization slider and switch update the live processor and retain the saved amount",
+    );
+    flushSync(() => usePreferences.getState().set({ voice: { ...voicePresets[1].settings } }));
     active.update = update;
     report(
       "PASS preset selection stays visible, reaches the live processor through useCapture, survives reopening and storage reload, and recognizes custom settings",
