@@ -378,11 +378,16 @@ export type BroadcastStatus = {
   serverTime: number;
 };
 
+export const recordingTargetLufs = -15;
 export const recordingInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   folder: z.string().trim().max(200).default(""),
+  normalizeAudio: z.boolean().optional(),
 });
 export type RecordingInput = z.infer<typeof recordingInputSchema>;
+export const recordingExportSchema = z.object({
+  normalizeAudio: z.boolean().optional(),
+});
 export const recordingCleanupSchema = z.object({
   confirmed: z.literal(true),
   ids: z
@@ -403,6 +408,8 @@ export type Recording = {
   savedBytes: number;
   exportStatus: "none" | "exporting" | "ready" | "failed";
   exportedSeconds?: number;
+  normalizeAudio?: boolean;
+  audioNormalization?: "applied" | "skipped";
   error?: string;
   downloadUrl?: string;
 };

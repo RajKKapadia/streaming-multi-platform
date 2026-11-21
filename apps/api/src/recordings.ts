@@ -14,7 +14,12 @@ import { join, posix, resolve, relative, isAbsolute, dirname } from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
 import { EgressStatus, type EgressInfo } from "livekit-server-sdk";
-import type { Recording, RecordingInput, RecordingsSnapshot } from "@studio/contracts";
+import {
+  recordingTargetLufs,
+  type Recording,
+  type RecordingInput,
+  type RecordingsSnapshot,
+} from "@studio/contracts";
 import type { Config } from "./config";
 import type { Auth } from "./auth";
 import { activeEgress, RendererUnavailableError, type Gateway } from "./livekit";
@@ -31,6 +36,8 @@ const manifestSchema = z.object({
   endedAt: z.number().optional(),
   exportStatus: z.enum(["none", "exporting", "ready", "failed"]),
   exportedSeconds: z.number().optional(),
+  normalizeAudio: z.boolean().optional(),
+  audioNormalization: z.enum(["applied", "skipped"]).optional(),
   error: z.string().optional(),
 });
 type Manifest = z.infer<typeof manifestSchema>;
@@ -126,6 +133,7 @@ export class RecordingService {
         status: "starting",
         startedAt: Date.now(),
         exportStatus: "none",
+        normalizeAudio: input.normalizeAudio,
       };
       await this.directory(r.relativeDirectory, true);
       await this.save(r);
@@ -196,7 +204,7 @@ export class RecordingService {
     return this.snapshot(studio);
   }
 
-  async export(studio: string, id: string) {
+  async export(studio: string, id: string, normalizeAudio?: boolean) {
     await this.serial(studio, async () => {
       const r = (await this.reconcile(studio)).find((r) => r.id === id);
       if (!r) throw new RecordingError("The recording was not found.");
@@ -210,6 +218,7 @@ export class RecordingService {
         throw new RecordingError(
           "Wait for recording startup or stopping to finish before exporting.",
         );
+      r.normalizeAudio = normalizeAudio ?? r.normalizeAudio;
       await this.beginExport(r, segments);
     });
     return this.snapshot(studio);
@@ -374,11 +383,12 @@ export class RecordingService {
     await this.save(r);
     const task = this.makeMP4(r, segments)
       .then(
-        () =>
+        (audioNormalization) =>
           this.serial(r.studio, async () => {
             const latest = (await this.records(r.studio)).find((item) => item.id === r.id)!;
             latest.exportStatus = "ready";
             latest.exportedSeconds = segments.reduce((sum, s) => sum + s.duration, 0);
+            latest.audioNormalization = audioNormalization;
             latest.error = undefined;
             await this.save(latest);
           }),
@@ -386,8 +396,9 @@ export class RecordingService {
           this.serial(r.studio, async () => {
             const latest = (await this.records(r.studio)).find((item) => item.id === r.id)!;
             latest.exportStatus = "failed";
-            latest.error =
-              "MP4 export failed. Check free disk space and FFmpeg, then retry. Saved segments have been kept.";
+            latest.error = r.normalizeAudio
+              ? "MP4 export failed. Check free disk space and FFmpeg, then retry or export with normalization off. Saved segments have been kept."
+              : "MP4 export failed. Check free disk space and FFmpeg, then retry. Saved segments have been kept.";
             await this.save(latest);
           }),
       )
@@ -398,7 +409,10 @@ export class RecordingService {
     void task.finally(() => this.exports.delete(r.id));
   }
 
-  private async makeMP4(r: Manifest, segments: Segment[]) {
+  private async makeMP4(
+    r: Manifest,
+    segments: Segment[],
+  ): Promise<Recording["audioNormalization"]> {
     const directory = await this.directory(r.relativeDirectory, false);
     // A finite, private playlist freezes the snapshot without interrupting Egress.
     const playlist = [
@@ -413,30 +427,35 @@ export class RecordingService {
     const attempt = crypto.randomUUID();
     const input = join(directory, `export-${attempt}.m3u8`);
     const partial = join(directory, `export-${attempt}.partial.mp4`);
+    const source = ["-protocol_whitelist", "file,crypto,data", "-i", input];
+    const streams = ["-map", "0:v:0", "-map", "0:a:0?", "-c:v", "copy"];
     await this.atomic(input, playlist);
     try {
-      await run(this.config.ffmpegPath, [
-        "-nostdin",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-y",
-        "-protocol_whitelist",
-        "file,crypto,data",
-        "-i",
-        input,
-        "-map",
-        "0:v:0",
-        "-map",
-        "0:a:0?",
-        "-c",
-        "copy",
-        "-bsf:a",
-        "aac_adtstoasc",
-        "-movflags",
-        "+faststart",
-        partial,
-      ]);
+      const filter = r.normalizeAudio
+        ? await normalizationFilter(this.config.ffmpegPath, source, streams)
+        : undefined;
+      const audio = filter
+        ? ["-af", filter, "-c:a", "aac", "-ar", "48000", "-b:a", "256k"]
+        : ["-c:a", "copy", "-bsf:a", "aac_adtstoasc"];
+      await run(
+        this.config.ffmpegPath,
+        [
+          "-nostdin",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-y",
+          "-filter_threads",
+          "1",
+          ...source,
+          ...streams,
+          ...audio,
+          "-movflags",
+          "+faststart",
+          partial,
+        ],
+        filter ? { timeout: normalizationTimeout } : undefined,
+      );
       const output = await open(partial, "r");
       try {
         await output.sync();
@@ -444,6 +463,7 @@ export class RecordingService {
         await output.close();
       }
       await rename(partial, join(directory, "recording.mp4"));
+      return filter ? "applied" : r.normalizeAudio ? "skipped" : undefined;
     } finally {
       await Promise.all([rm(partial, { force: true }), rm(input, { force: true })]);
     }
@@ -569,12 +589,79 @@ function recordingPlaylist(job: EgressInfo) {
   return undefined;
 }
 
-function run(command: string, args: string[]): Promise<void> {
+const normalizationTimeout = 60 * 60_000;
+// Reserve headroom for peaks introduced by the AAC encode.
+const normalizationPeak = -2;
+const loudnorm = `loudnorm=I=${recordingTargetLufs}:TP=${normalizationPeak}:LRA=50:dual_mono=true`;
+
+async function normalizationFilter(command: string, source: string[], streams: string[]) {
+  // Map video with stream copy to the null muxer so video-only recovery can use
+  // the same analysis command without failing for an empty output stream map.
+  const stderr = await run(
+    command,
+    [
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "info",
+      "-nostats",
+      "-filter_threads",
+      "1",
+      ...source,
+      ...streams,
+      "-af",
+      `${loudnorm}:print_format=json`,
+      "-f",
+      "null",
+      "-",
+    ],
+    { capture: true, timeout: normalizationTimeout },
+  );
+  const report = stderr.match(/\{\s*"input_i"\s*:[^{}]*\}/)?.[0];
+  if (!report) return undefined; // No audio stream.
+  const stats = JSON.parse(report);
+  if (stats.input_i === "-inf") return undefined; // Silence or below the loudness gate.
+  const integrated = Number(stats.input_i);
+  const peak = Number(stats.input_tp);
+  const range = Number(stats.input_lra);
+  const threshold = Number(stats.input_thresh);
+  const offset = Number(stats.target_offset);
+  if (![integrated, peak, range, threshold].every(Number.isFinite))
+    throw new Error("Invalid recording loudness measurements.");
+
+  const gain = recordingTargetLufs - integrated;
+  // Use the same fixed gain on every channel when the source has enough headroom.
+  if (peak + gain <= normalizationPeak) return `volume=${gain.toFixed(2)}dB`;
+
+  return [
+    loudnorm,
+    "linear=false",
+    `measured_I=${integrated}`,
+    `measured_TP=${peak}`,
+    `measured_LRA=${range}`,
+    `measured_thresh=${threshold}`,
+    `offset=${Number.isFinite(offset) ? offset : 0}`,
+  ].join(":");
+}
+
+function run(
+  command: string,
+  args: string[],
+  options?: { capture?: boolean; timeout?: number },
+): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: "ignore", timeout: 10 * 60_000 });
+    const child = spawn(command, args, {
+      stdio: ["ignore", "ignore", options?.capture ? "pipe" : "ignore"],
+      timeout: options?.timeout ?? 10 * 60_000,
+    });
+    let stderr = "";
+    child.stderr?.setEncoding("utf8").on("data", (chunk: string) => {
+      // FFmpeg writes its report at the end. Bound memory use for long recordings.
+      stderr = (stderr + chunk).slice(-16_384);
+    });
     child.on("error", reject);
     child.on("close", (code) =>
-      code === 0 ? resolve() : reject(new Error("Recording subprocess failed.")),
+      code === 0 ? resolve(stderr) : reject(new Error("Recording subprocess failed.")),
     );
   });
 }

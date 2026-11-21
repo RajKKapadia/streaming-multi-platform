@@ -84,17 +84,18 @@ function ffmpeg(args: string[]) {
   ]);
   if (result.status !== 0) throw new Error(result.stderr.toString());
 }
-async function media(record: Recording, seconds = 4) {
+async function media(
+  record: Recording,
+  seconds = 4,
+  audio: string | null = "sine=frequency=440:sample_rate=48000,volume=0.25",
+) {
   // Real H.264 + AAC segments, without devices, LiveKit, or streaming destinations.
   ffmpeg([
     "-f",
     "lavfi",
     "-i",
     "testsrc2=size=160x90:rate=10",
-    "-f",
-    "lavfi",
-    "-i",
-    "sine=frequency=440:sample_rate=48000",
+    ...(audio ? ["-f", "lavfi", "-i", audio] : []),
     "-t",
     String(seconds),
     "-c:v",
@@ -115,6 +116,46 @@ async function media(record: Recording, seconds = 4) {
     join(record.directory, "segment_%05d.ts"),
     join(record.directory, "recording.m3u8"),
   ]);
+}
+function measureLoudness(path: string, channel?: number) {
+  const result = spawnSync("ffmpeg", [
+    "-nostdin",
+    "-hide_banner",
+    "-nostats",
+    "-i",
+    path,
+    "-map",
+    "0:a:0",
+    "-af",
+    `${channel === undefined ? "" : `pan=mono|c0=c${channel},`}ebur128=peak=true:dualmono=true:framelog=verbose`,
+    "-f",
+    "null",
+    "-",
+  ]);
+  const stderr = result.stderr.toString();
+  const summary = stderr.split("Summary:").at(-1) ?? "";
+  const loudness = summary.match(/I:\s+(-?[\d.]+) LUFS/)?.[1];
+  const peak = summary.match(/Peak:\s+(-?[\d.]+) dBFS/)?.[1];
+  if (result.status !== 0 || !loudness || !peak) throw new Error(stderr);
+  return { lufs: Number(loudness), peak: Number(peak) };
+}
+function videoHash(path: string) {
+  const result = spawnSync("ffmpeg", [
+    "-nostdin",
+    "-v",
+    "error",
+    "-i",
+    path,
+    "-map",
+    "0:v:0",
+    "-c:v",
+    "copy",
+    "-f",
+    "hash",
+    "-",
+  ]);
+  if (result.status !== 0) throw new Error(result.stderr.toString());
+  return result.stdout.toString();
 }
 async function exported(service: RecordingService): Promise<Recording> {
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -154,12 +195,13 @@ test("local recording uses the internal API renderer while cloud recording needs
       .recordingsEnabled,
   ).toBe(false);
 });
-test("continuous segments, Save so far, restart, delayed stop and final MP4 retain video and audio", async () => {
+test("Save so far and the final MP4 after restart normalize the full saved mono audio", async () => {
   const f = await fixture();
   try {
     const started = await f.service.start("personal", {
       name: "Lesson 1",
       folder: "courses/lesson-01",
+      normalizeAudio: true,
     });
     const record = started.recordings[0]!;
     expect(record.directory).toStartWith(join(f.root, "courses/lesson-01/personal"));
@@ -171,6 +213,7 @@ test("continuous segments, Save so far, restart, delayed stop and final MP4 reta
     await f.service.export("personal", record.id);
     const first = await exported(f.service);
     expect(first.exportedSeconds).toBe(4);
+    expect(first.audioNormalization).toBe("applied");
     expect(f.gateway.stops).toEqual([]);
     const result = await f.service.download("personal", record.id);
     const probe = spawnSync("ffprobe", [
@@ -188,6 +231,7 @@ test("continuous segments, Save so far, restart, delayed stop and final MP4 reta
       "audio",
     ]);
     expect(Number(info.format.duration)).toBeGreaterThanOrEqual(4);
+    expect(Math.abs(measureLoudness(result.path).lufs + 15)).toBeLessThan(0.3);
     const restarted = new RecordingService(f.config, f.gateway, f.auth);
     expect((await restarted.snapshot("personal")).recordings[0]!.status).toBe("recording");
     f.gateway.stopEnding = true;
@@ -199,11 +243,65 @@ test("continuous segments, Save so far, restart, delayed stop and final MP4 reta
     const final = await exported(restarted);
     expect(final.status).toBe("finished");
     expect(final.exportedSeconds).toBe(6);
+    expect(final.audioNormalization).toBe("applied");
+    expect(Math.abs(measureLoudness(result.path).lufs + 15)).toBeLessThan(0.3);
     expect((await readdir(record.directory)).filter((name) => name.endsWith(".ts"))).toHaveLength(
       3,
     );
   } finally {
     await rm(f.root, { recursive: true, force: true });
+  }
+}, 20000);
+test("existing exports can be normalized with peak protection while retaining stereo balance and copied video", async () => {
+  const f = await fixture();
+  try {
+    const record = (await f.service.start("personal", { name: "Stereo recording", folder: "" }))
+      .recordings[0]!;
+    const tone = "0.028*sin(2*PI*440*t)+if(between(t\\,3.50\\,3.55)\\,0.8*sin(2*PI*140*t)\\,0)";
+    await media(record, 8, `aevalsrc=${tone}|0.32*(${tone}):s=48000`);
+    await f.service.stop("personal", record.id);
+    expect((await exported(f.service)).audioNormalization).toBeUndefined();
+    const { path } = await f.service.download("personal", record.id);
+    const original = measureLoudness(path);
+    const originalVideo = videoHash(path);
+    expect(original.lufs).toBeLessThan(-24);
+    expect(original.peak + (-15 - original.lufs)).toBeGreaterThan(0);
+
+    await f.service.export("personal", record.id, true);
+    expect((await exported(f.service)).audioNormalization).toBe("applied");
+    const normalized = measureLoudness(path);
+    expect(Math.abs(normalized.lufs + 15)).toBeLessThan(1);
+    expect(normalized.peak).toBeLessThan(-1);
+    expect(measureLoudness(path, 0).lufs - measureLoudness(path, 1).lufs).toBeCloseTo(9.9, 0);
+    expect(videoHash(path)).toBe(originalVideo);
+
+    await f.service.export("personal", record.id, false);
+    expect((await exported(f.service)).audioNormalization).toBeUndefined();
+    expect(measureLoudness(path)).toEqual(original);
+  } finally {
+    await rm(f.root, { recursive: true, force: true });
+  }
+}, 20000);
+
+test("normalization skips silent and video-only recordings and still produces a download", async () => {
+  for (const audio of ["anullsrc=r=48000:cl=mono", null]) {
+    const f = await fixture();
+    try {
+      const record = (
+        await f.service.start("personal", {
+          name: "Silent recording",
+          folder: "",
+          normalizeAudio: true,
+        })
+      ).recordings[0]!;
+      await media(record, 2, audio);
+      await f.service.stop("personal", record.id);
+      expect((await exported(f.service)).audioNormalization).toBe("skipped");
+      const { path } = await f.service.download("personal", record.id);
+      expect(videoHash(path)).toStartWith("SHA256=");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
   }
 }, 20000);
 test("interrupted recordings recover saved segments after an API restart and preserve originals on export failure", async () => {
@@ -339,6 +437,10 @@ test("host-only recording routes reject guests, render tokens, cross-studio cook
     expect(snapshot.recordings[0].status).toBe("recording");
     expect(JSON.stringify(snapshot)).not.toContain("egressId");
     const record = snapshot.recordings[0] as Recording;
+    expect(
+      (await request(`/${record.id}/export`, "POST", token("host"), { normalizeAudio: "yes" }))
+        .status,
+    ).toBe(400);
     await media(record);
     await recordings.export("personal", record.id);
     await exported(recordings);

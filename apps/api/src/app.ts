@@ -9,6 +9,7 @@ import {
   messageInputSchema,
   visualSchema,
   recordingInputSchema,
+  recordingExportSchema,
   recordingCleanupSchema,
 } from "@studio/contracts";
 import { configurationIssues, type Config } from "./config";
@@ -317,9 +318,13 @@ export function createApp(config: Config, gateway?: Gateway) {
   app.post("/api/studios/:studio/recordings/:id/stop", host, recordingId, async (req, res) =>
     res.json(await recordings.stop(res.locals.studio, String(req.params.id))),
   );
-  app.post("/api/studios/:studio/recordings/:id/export", host, recordingId, async (req, res) =>
-    res.json(await recordings.export(res.locals.studio, String(req.params.id))),
-  );
+  app.post("/api/studios/:studio/recordings/:id/export", host, recordingId, async (req, res) => {
+    const input = recordingExportSchema.safeParse(req.body === undefined ? {} : req.body);
+    if (!input.success) return res.status(400).json({ error: "Invalid MP4 export settings." });
+    res.json(
+      await recordings.export(res.locals.studio, String(req.params.id), input.data.normalizeAudio),
+    );
+  });
   app.get(
     "/api/studios/:studio/recordings/:id/download",
     host,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Circle, Download, Square, Trash2 } from "lucide-react";
 import { Button, Dialog, Input } from "@studio/ui";
-import type { Recording, RecordingsSnapshot } from "@studio/contracts";
+import { recordingTargetLufs, type Recording, type RecordingsSnapshot } from "@studio/contracts";
 import { api, studioPath } from "./api";
 
 export function useRecordings(studioId: string, enabled: boolean) {
@@ -37,6 +37,30 @@ function duration(seconds: number) {
     .padStart(2, "0")}:${(n % 60).toString().padStart(2, "0")}`;
 }
 
+const loudnessTarget = `−${Math.abs(recordingTargetLufs)} LUFS`;
+
+function NormalizeAudio({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="recording-normalize">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      Normalize MP4 audio to {loudnessTarget}
+    </label>
+  );
+}
+
 export function Recordings({
   open,
   onClose,
@@ -56,6 +80,8 @@ export function Recordings({
 }) {
   const [name, setName] = useState(title);
   const [folder, setFolder] = useState("");
+  const [normalizeAudio, setNormalizeAudio] = useState(true);
+  const [exportAudio, setExportAudio] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [cleanup, setCleanup] = useState<Recording[] | null>(null);
@@ -201,7 +227,7 @@ export function Recordings({
               className="recording-form"
               onSubmit={(e) => {
                 e.preventDefault();
-                void action("recordings/start", { name, folder });
+                void action("recordings/start", { name, folder, normalizeAudio });
               }}
             >
               <label>
@@ -227,6 +253,14 @@ export function Recordings({
                 Saved under the folder above, followed by the studio and a unique recording ID. Use
                 letters, numbers, hyphens, underscores, and slashes.
               </p>
+              <div>
+                <NormalizeAudio
+                  checked={normalizeAudio}
+                  disabled={!!busy}
+                  onChange={setNormalizeAudio}
+                />
+                <p className="hint">Levels the full mix when creating an MP4.</p>
+              </div>
               <Button
                 type="submit"
                 disabled={!!busy || !snapshot?.enabled || !connected || !name.trim()}
@@ -276,14 +310,31 @@ export function Recordings({
                 )}
                 {recording.exportStatus === "exporting" && (
                   <p className="hint" role="status">
-                    Creating MP4… Saved segments are retained.
+                    {recording.normalizeAudio
+                      ? "Normalizing audio and creating MP4…"
+                      : "Creating MP4…"}{" "}
+                    Saved segments are retained.
                   </p>
                 )}
                 {recording.exportStatus === "ready" && (
                   <p className="hint">
                     MP4 contains {duration(recording.exportedSeconds || 0)}
                     {recordingActive(recording) ? " · snapshot; recording continues" : ""}.
+                    {recording.audioNormalization === "applied"
+                      ? ` Audio normalized toward ${loudnessTarget}.`
+                      : recording.audioNormalization === "skipped"
+                        ? " No measurable audio to normalize."
+                        : ""}
                   </p>
+                )}
+                {!recordingActive(recording) && recording.segments > 0 && (
+                  <NormalizeAudio
+                    checked={exportAudio[recording.id] ?? recording.normalizeAudio ?? true}
+                    disabled={!!busy || recording.exportStatus === "exporting"}
+                    onChange={(value) =>
+                      setExportAudio((settings) => ({ ...settings, [recording.id]: value }))
+                    }
+                  />
                 )}
                 <div className="recording-actions">
                   {recordingActive(recording) && (
@@ -306,7 +357,17 @@ export function Recordings({
                       recording.exportStatus === "exporting" ||
                       ["starting", "stopping"].includes(recording.status)
                     }
-                    onClick={() => void action(`recordings/${recording.id}/export`)}
+                    onClick={() =>
+                      void action(
+                        `recordings/${recording.id}/export`,
+                        recordingActive(recording)
+                          ? {}
+                          : {
+                              normalizeAudio:
+                                exportAudio[recording.id] ?? recording.normalizeAudio ?? true,
+                            },
+                      )
+                    }
                   >
                     {recordingActive(recording) ? "Save so far" : "Export saved segments"}
                   </Button>
